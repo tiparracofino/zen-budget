@@ -19,12 +19,11 @@
     --text-muted: #6B6B65;
     --border: rgba(28,28,26,0.06);
     --aka: #B04A4A;
+    --edit-blue: #C2A878;
   }
 
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; overflow: hidden; background: var(--bg-list-header); }
-
-  body { font-family: 'Zen Kaku Gothic New', sans-serif; color: var(--text-main); font-size: 15px; }
+  body { font-family: 'Zen Kaku Gothic New', sans-serif; background: var(--bg-list-header); color: var(--text-main); overflow: hidden; height: 100vh; }
 
   .app { display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-list-header); position: relative; }
 
@@ -34,57 +33,55 @@
   .logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--text-gold); letter-spacing: 0.12em; }
   .month-nav { display: flex; align-items: center; background: var(--bg-pill); border-radius: 20px; padding: 2px 4px; }
   .month-btn { background: none; border: none; color: rgba(255,255,255,0.5); width: 30px; height: 30px; font-size: 16px; cursor: pointer; }
-  .month-label { font-size: 13px; color: rgba(255,255,255,0.85); padding: 0 8px; min-width: 100px; text-align: center; }
+  .month-label { font-size: 13px; color: rgba(255,255,255,0.85); min-width: 100px; text-align: center; }
   
   .summary-pills { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .pill { background: var(--bg-pill); border-radius: 12px; padding: 12px 8px; text-align: center; }
-  .pill-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 4px; display: block; }
-  .pill-value { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: rgba(255,255,255,0.85); }
-  .pill-value.green { color: var(--text-green); }
+  .pill-label { font-size: 8px; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 4px; display: block; }
+  .pill-value { font-family: 'Cormorant Garamond', serif; font-size: 16px; color: rgba(255,255,255,0.85); }
   .pill-value.neg-red { color: var(--aka) !important; font-weight: 600; }
 
-  /* ── BANNER ── */
-  .assign-banner { background: var(--bg-banner); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .assign-value { font-family: 'Cormorant Garamond', serif; font-size: 26px; color: var(--text-banner-light); }
+  .assign-banner { background: var(--bg-banner); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .assign-value { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--text-banner-light); }
 
   /* ── CONTENT ── */
   .content { flex: 1; overflow-y: auto; padding-bottom: 100px; }
   .panel { display: none; }
   .panel.active { display: block; }
 
-  /* ── SECCIONES DE GESTIÓN (Pestaña Cuentas) ── */
-  .manage-section { margin-bottom: 32px; }
-  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 10px; border-bottom: 1px solid var(--border); }
-  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); font-weight: 700; }
+  /* ── SWIPE SYSTEM ── */
+  .swipe-container { position: relative; overflow: hidden; background: var(--bg-card); border-bottom: 1px solid var(--border); touch-action: pan-y; }
   
-  /* ── FILAS ── */
-  .row { display: grid; grid-template-columns: 1fr auto auto; padding: 16px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border); align-items: center; }
-  .row-info { display: flex; align-items: center; gap: 12px; }
-  .row-main { font-size: 15px; color: var(--text-main); }
-  .row-sub { font-size: 12px; color: var(--text-muted); }
-  .val-assigned { font-size: 14px; text-align: right; padding: 4px 8px; border-radius: 6px; color: var(--text-muted); }
-  .val-avail { font-size: 14px; text-align: right; min-width: 80px; }
-  .pos { color: var(--bg-banner); }
-  .neg { color: var(--aka); }
+  .swipe-actions-left, .swipe-actions-right {
+    position: absolute; top: 0; bottom: 0; display: flex; align-items: center; width: 80px; color: white; font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .swipe-actions-left { left: 0; background: var(--edit-blue); justify-content: center; }
+  .swipe-actions-right { right: 0; background: var(--aka); justify-content: center; }
 
-  .group-header { background: var(--bg-list-header); padding: 10px 20px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; }
+  .swipe-content {
+    position: relative; z-index: 2; background: var(--bg-card); padding: 16px 20px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+  }
+
+  /* ── ROW STYLES ── */
+  .row-info { display: flex; align-items: center; gap: 12px; }
+  .group-header { background: var(--bg-list-header); padding: 12px 20px; font-size: 10px; text-transform: uppercase; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; font-weight: 700; letter-spacing: 0.1em; }
 
   /* ── NAV ── */
-  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-dark); display: flex; padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid var(--border-dark); }
-  .nav-tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px 0; color: rgba(255,255,255,0.4); background: none; border: none; font-size: 18px; }
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-dark); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 50; }
+  .nav-tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px 0; color: rgba(255,255,255,0.4); background: none; border: none; }
   .nav-tab.active { color: var(--text-gold); }
   .nav-label { font-size: 8px; text-transform: uppercase; margin-top: 4px; }
 
-  .fab { position: fixed; bottom: 85px; right: 20px; width: 56px; height: 56px; background: var(--bg-banner); border-radius: 50%; color: white; font-size: 24px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .fab { position: fixed; bottom: 85px; right: 20px; width: 56px; height: 56px; background: var(--bg-banner); border-radius: 50%; color: white; font-size: 24px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 40; }
 
   /* ── MODALS ── */
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: flex-end; z-index: 100; }
   .overlay.open { display: flex; }
-  .sheet { background: var(--bg-card); width: 100%; padding: 24px; border-radius: 20px 20px 0 0; }
+  .sheet { background: var(--bg-card); width: 100%; padding: 24px; border-radius: 20px 20px 0 0; max-height: 80vh; overflow-y: auto; }
   .form-input { width: 100%; padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; }
-  .btn-save { width: 100%; padding: 16px; background: var(--bg-banner); color: white; border: none; border-radius: 12px; font-size: 16px; }
+  .btn-save { width: 100%; padding: 16px; background: var(--bg-banner); color: white; border: none; border-radius: 12px; font-size: 16px; margin-top: 8px; }
 
-  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--bg-dark); color: white; padding: 12px 24px; border-radius: 8px; opacity: 0; transition: 0.3s; z-index: 200; }
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--bg-dark); color: white; padding: 10px 20px; border-radius: 8px; opacity: 0; z-index: 200; pointer-events: none; transition: 0.3s; }
   .toast.show { opacity: 1; }
 </style>
 </head>
@@ -114,38 +111,14 @@
   </div>
 
   <div class="content">
-    
-    <div class="panel active" id="panel-budget">
-      <div id="budgetBody"></div>
-    </div>
-
-    <div class="panel" id="panel-mov">
-      <div id="txBody"></div>
-    </div>
-
+    <div class="panel active" id="panel-budget"></div>
+    <div class="panel" id="panel-mov"></div>
     <div class="panel" id="panel-manage">
-      
-      <div class="manage-section">
-        <div class="section-header">
-          <span class="section-title">Cuentas y Saldo</span>
-          <button class="btn-tiny-add" onclick="openAccountSheet()">+</button>
-        </div>
-        <div id="manage-accounts-list"></div>
-        <div style="padding: 15px 20px; text-align: right">
-            <span style="font-size: 11px; color: var(--text-muted)">PATRIMONIO: </span>
-            <span id="total-net-worth" style="font-weight: 500"></span>
-        </div>
-      </div>
-
-      <div class="manage-section">
-        <div class="section-header">
-          <span class="section-title">Grupos y Categorías</span>
-          <button class="btn-tiny-add" onclick="openGroupSheet()">+ Grupo</button>
-        </div>
-        <div id="manage-structure-list"></div>
-      </div>
+      <div class="group-header">CUENTAS <button onclick="openAccountSheet()" style="background:none; border:none; color:var(--text-gold)">+</button></div>
+      <div id="manage-accounts-list"></div>
+      <div class="group-header">ESTRUCTURA <button onclick="openGroupSheet()" style="background:none; border:none; color:var(--text-gold)">+ Grupo</button></div>
+      <div id="manage-structure-list"></div>
     </div>
-
   </div>
 
   <button class="fab" onclick="openTxSheet()">+</button>
@@ -158,68 +131,20 @@
 
 <div id="toast" class="toast"></div>
 
-<div class="overlay" id="overlay-assign" onclick="this.classList.remove('open')">
-    <div class="sheet" onclick="event.stopPropagation()">
-        <h3 id="assign-title" style="margin-bottom:15px">Asignar</h3>
-        <input type="number" id="inp-amount" class="form-input" placeholder="0.00">
-        <button class="btn-save" onclick="saveAssign()">Guardar</button>
-    </div>
-</div>
-
-<div class="overlay" id="overlay-tx" onclick="this.classList.remove('open')">
-    <div class="sheet" onclick="event.stopPropagation()">
-        <div style="display:flex; gap:10px; margin-bottom:15px">
-            <button id="btn-t-exp" onclick="setTxType('expense')" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd; background:#181715; color:white">Gasto</button>
-            <button id="btn-t-inc" onclick="setTxType('income')" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd; background:white">Ingreso</button>
-        </div>
-        <input type="date" id="tx-date" class="form-input">
-        <input type="text" id="tx-concept" class="form-input" placeholder="Concepto">
-        <input type="number" id="tx-amount" class="form-input" placeholder="0.00">
-        <select id="tx-account" class="form-input"></select>
-        <select id="tx-category" class="form-input"></select>
-        <button class="btn-save" onclick="saveTx()">Registrar</button>
-    </div>
-</div>
-
-<div class="overlay" id="overlay-account" onclick="this.classList.remove('open')">
-    <div class="sheet" onclick="event.stopPropagation()">
-        <h3>Nueva Cuenta</h3>
-        <input type="text" id="acc-emoji" class="form-input" placeholder="Emoji (🏦)">
-        <input type="text" id="acc-name" class="form-input" placeholder="Nombre (Ej: BBVA)">
-        <input type="number" id="acc-balance" class="form-input" placeholder="Saldo inicial">
-        <button class="btn-save" onclick="saveNewAccount()">Crear Cuenta</button>
-    </div>
-</div>
-
-<div class="overlay" id="overlay-group" onclick="this.classList.remove('open')">
-    <div class="sheet" onclick="event.stopPropagation()">
-        <h3>Nuevo Grupo</h3>
-        <input type="text" id="group-name" class="form-input" placeholder="Nombre del grupo">
-        <button class="btn-save" onclick="saveNewGroup()">Crear Grupo</button>
-    </div>
-</div>
-
-<div class="overlay" id="overlay-cat" onclick="this.classList.remove('open')">
-    <div class="sheet" onclick="event.stopPropagation()">
-        <h3>Nueva Categoría</h3>
-        <input type="text" id="cat-emoji" class="form-input" placeholder="Emoji">
-        <input type="text" id="cat-name" class="form-input" placeholder="Nombre">
-        <button class="btn-save" onclick="saveNewCat()">Añadir</button>
-    </div>
+<div class="overlay" id="overlay-generic" onclick="this.classList.remove('open')">
+    <div class="sheet" onclick="event.stopPropagation()" id="generic-sheet-content"></div>
 </div>
 
 <script>
-// --- MOTOR DE DATOS ---
-const STORAGE_KEY = 'MA_DATA_V2';
-const defaultState = {
+// --- DATA CORE ---
+const STORAGE_KEY = 'MA_DATA_V3';
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
     month: new Date().toISOString(),
     transactions: [],
     assignments: {},
     accounts: [{ id: 'a1', name: 'Efectivo', emoji: '💵' }],
-    groups: [{ id: 'g1', name: 'Gastos Fijos', cats: [{ id: 'c1', name: 'Alquiler', emoji: '🏠' }] }]
+    groups: [{ id: 'g1', name: 'Esenciales', cats: [{ id: 'c1', name: 'Comida', emoji: '🛒' }] }]
 };
-
-let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultState;
 state.currentMonthDate = new Date(state.month);
 
 function save() {
@@ -228,146 +153,217 @@ function save() {
     render();
 }
 
-// --- UTILIDADES ---
 const fmt = (n) => (n < 0 ? '-' : '') + '€' + Math.abs(n).toFixed(2).replace('.', ',');
 const getMStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+function showToast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
+
+// --- SWIPE LOGIC ---
+let startX = 0, currentX = 0, activeSwipeEl = null;
+
+function handleTouchStart(e) {
+    startX = e.touches[0].clientX;
+    activeSwipeEl = e.currentTarget.querySelector('.swipe-content');
+    activeSwipeEl.style.transition = 'none';
+}
+
+function handleTouchMove(e) {
+    if (!activeSwipeEl) return;
+    currentX = e.touches[0].clientX - startX;
+    // Limitar el swipe
+    if (currentX > 80) currentX = 80;
+    if (currentX < -80) currentX = -80;
+    activeSwipeEl.style.transform = `translateX(${currentX}px)`;
+}
+
+function handleTouchEnd(e) {
+    if (!activeSwipeEl) return;
+    activeSwipeEl.style.transition = 'transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28)';
+    if (currentX > 40) activeSwipeEl.style.transform = 'translateX(80px)';
+    else if (currentX < -40) activeSwipeEl.style.transform = 'translateX(-80px)';
+    else activeSwipeEl.style.transform = 'translateX(0)';
+    currentX = 0;
+}
+
+// Cerrar swipes abiertos al hacer click fuera
+document.addEventListener('touchstart', (e) => {
+    if (!e.target.closest('.swipe-container')) {
+        document.querySelectorAll('.swipe-content').forEach(el => el.style.transform = 'translateX(0)');
+    }
+});
+
+// --- RENDER ENGINE ---
 function render() {
     const mStr = getMStr(state.currentMonthDate);
     document.getElementById('monthLabel').textContent = MONTHS[state.currentMonthDate.getMonth()] + ' ' + state.currentMonthDate.getFullYear();
 
-    // 1. Cálculos de Barra Superior
-    let totalIn = 0, totalAssignedMonth = 0, totalSpentMonth = 0, totalAssignedAll = 0;
-    state.transactions.forEach(t => { if(t.type==='income' && t.date <= mStr + '-31') totalIn += t.amount; });
-    Object.keys(state.assignments).forEach(m => {
-        let monthTotal = Object.values(state.assignments[m]).reduce((a,b)=>a+b,0);
-        if(m <= mStr) totalAssignedAll += monthTotal;
-        if(m === mStr) totalAssignedMonth = monthTotal;
-    });
-    
-    // 2. Render Plan (Presupuesto)
-    const budgetBody = document.getElementById('budgetBody');
-    budgetBody.innerHTML = '';
+    // 1. Plan Panel
+    const budgetPanel = document.getElementById('panel-budget');
+    budgetPanel.innerHTML = '';
+    let tSpent = 0, tAssigned = 0;
+
     state.groups.forEach(g => {
-        let gHTML = `<div class="group-header"><span>${g.name}</span></div>`;
+        budgetPanel.innerHTML += `<div class="group-header">${g.name}</div>`;
         g.cats.forEach(c => {
-            let assigned = (state.assignments[mStr] && state.assignments[mStr][c.id]) || 0;
-            let spent = state.transactions.filter(t => t.type==='expense' && t.categoryId===c.id && getMStr(new Date(t.date))===mStr).reduce((a,b)=>a+b.amount,0);
-            if(getMStr(new Date()) === mStr) totalSpentMonth += spent;
-            let avail = assigned - spent;
-            gHTML += `
-                <div class="row" onclick="openAssignSheet('${c.id}', '${c.name}', ${assigned})">
-                    <div class="row-info"><span>${c.emoji}</span><span>${c.name}</span></div>
-                    <div class="val-assigned">${fmt(assigned)}</div>
-                    <div class="val-avail ${avail < 0 ? 'neg' : 'pos'}">${fmt(avail)}</div>
+            let ass = (state.assignments[mStr] && state.assignments[mStr][c.id]) || 0;
+            let spent = state.transactions.filter(t => t.categoryId === c.id && getMStr(new Date(t.date)) === mStr).reduce((a,b)=>a+b.amount,0);
+            tAssigned += ass; tSpent += spent;
+            let avail = ass - spent;
+            budgetPanel.innerHTML += `
+                <div class="swipe-container">
+                    <div class="swipe-content" onclick="openAssignDialog('${c.id}', '${c.name}', ${ass})">
+                        <div class="row-info"><span>${c.emoji}</span><span>${c.name}</span></div>
+                        <div style="font-size:13px; color:var(--text-muted); text-align:right">${fmt(ass)}</div>
+                        <div style="font-size:14px; text-align:right; width:80px" class="${avail < 0 ? 'neg' : 'pos'}">${fmt(avail)}</div>
+                    </div>
                 </div>`;
         });
-        budgetBody.innerHTML += gHTML;
     });
 
-    // 3. Render Gestionar (Cuentas + Estructura)
-    const accList = document.getElementById('manage-accounts-list');
-    accList.innerHTML = '';
-    let netWorth = 0;
-    state.accounts.forEach(acc => {
-        let bal = 0;
-        state.transactions.forEach(t => { if(t.accountId === acc.id) bal += (t.type==='income'?t.amount:-t.amount); });
-        netWorth += bal;
-        accList.innerHTML += `<div class="row"><div>${acc.emoji} ${acc.name}</div><div></div><div class="val-avail">${fmt(bal)}</div></div>`;
-    });
-    document.getElementById('total-net-worth').textContent = fmt(netWorth);
-
-    const structList = document.getElementById('manage-structure-list');
-    structList.innerHTML = '';
+    // 2. Manage Panel (With Double Swipe)
+    const structPanel = document.getElementById('manage-structure-list');
+    structPanel.innerHTML = '';
     state.groups.forEach(g => {
-        structList.innerHTML += `<div class="group-header"><span>${g.name}</span><button onclick="openCatSheet('${g.id}')" style="background:none; border:none; color:var(--text-gold)">+ Categoría</button></div>`;
+        structPanel.innerHTML += `<div class="group-header"><span>${g.name}</span> <button onclick="openAddCatDialog('${g.id}')" style="background:none; border:none; color:var(--text-gold)">+ Cat</button></div>`;
         g.cats.forEach(c => {
-            structList.innerHTML += `<div class="row"><div>${c.emoji} ${c.name}</div></div>`;
+            structPanel.innerHTML += `
+                <div class="swipe-container" ontouchstart="handleTouchStart(event)" ontouchmove="handleTouchMove(event)" ontouchend="handleTouchEnd(event)">
+                    <div class="swipe-actions-left" onclick="openEditCatDialog('${c.id}')">EDITAR</div>
+                    <div class="swipe-actions-right" onclick="deleteCat('${c.id}')">BORRAR</div>
+                    <div class="swipe-content">
+                        <div class="row-info"><span>${c.emoji}</span><span>${c.name}</span></div>
+                    </div>
+                </div>`;
         });
     });
 
-    // 4. Barra Superior
-    document.getElementById('s-assigned').textContent = fmt(totalAssignedMonth);
-    document.getElementById('s-spent').textContent = fmt(totalSpentMonth);
-    const availFinal = totalAssignedMonth - totalSpentMonth;
+    // Cuentas
+    const accPanel = document.getElementById('manage-accounts-list');
+    accPanel.innerHTML = '';
+    state.accounts.forEach(a => {
+        let bal = state.transactions.filter(t=>t.accountId===a.id).reduce((sum,t)=>sum+(t.type==='income'?t.amount:-t.amount), 0);
+        accPanel.innerHTML += `<div class="row-info" style="padding:16px 20px; background:#fff; border-bottom:1px solid var(--border)"><span>${a.emoji}</span><span>${a.name}</span> <span style="margin-left:auto">${fmt(bal)}</span></div>`;
+    });
+
+    // Summary
+    document.getElementById('s-assigned').textContent = fmt(tAssigned);
+    document.getElementById('s-spent').textContent = fmt(tSpent);
+    const availFinal = tAssigned - tSpent;
     const availEl = document.getElementById('s-avail');
     availEl.textContent = fmt(availFinal);
-    availEl.className = 'pill-value ' + (availFinal < 0 ? 'neg-red' : 'green');
-    document.getElementById('toAssignVal').textContent = fmt(totalIn - totalAssignedAll);
+    availEl.className = 'pill-value ' + (availFinal < 0 ? 'neg-red' : '');
+    
+    let totalIn = state.transactions.filter(t=>t.type==='income' && t.date <= mStr + '-31').reduce((a,b)=>a+b.amount, 0);
+    let totalAssignedGlobal = 0;
+    Object.keys(state.assignments).forEach(m => { if(m <= mStr) totalAssignedGlobal += Object.values(state.assignments[m]).reduce((a,b)=>a+b,0); });
+    document.getElementById('toAssignVal').textContent = fmt(totalIn - totalAssignedGlobal);
 }
 
-// --- ACCIONES ---
-let activeCatId, activeGroupId;
-function openAssignSheet(id, name, val) { 
-    activeCatId = id; 
-    document.getElementById('assign-title').textContent = name;
-    document.getElementById('inp-amount').value = val;
-    document.getElementById('overlay-assign').classList.add('open');
+// --- DIALOGS & ACTIONS ---
+function openEditCatDialog(id) {
+    let cat = null;
+    state.groups.forEach(g => { let c = g.cats.find(x=>x.id===id); if(c) cat=c; });
+    const sheet = document.getElementById('generic-sheet-content');
+    sheet.innerHTML = `
+        <h3>Editar Categoría</h3>
+        <input type="text" id="edit-emoji" class="form-input" value="${cat.emoji}">
+        <input type="text" id="edit-name" class="form-input" value="${cat.name}">
+        <button class="btn-save" onclick="saveEditCat('${id}')">Guardar Cambios</button>
+    `;
+    document.getElementById('overlay-generic').classList.add('open');
 }
-function saveAssign() {
+
+function saveEditCat(id) {
+    state.groups.forEach(g => {
+        let c = g.cats.find(x=>x.id===id);
+        if(c) {
+            c.name = document.getElementById('edit-name').value;
+            c.emoji = document.getElementById('edit-emoji').value;
+        }
+    });
+    document.getElementById('overlay-generic').classList.remove('open');
+    save();
+}
+
+function deleteCat(id) {
+    if (state.transactions.some(t => t.categoryId === id)) {
+        showToast("No se puede: tiene movimientos");
+        return;
+    }
+    state.groups.forEach(g => {
+        const idx = g.cats.findIndex(c => c.id === id);
+        if(idx !== -1) g.cats.splice(idx, 1);
+    });
+    save();
+}
+
+function openAssignDialog(id, name, val) {
+    const sheet = document.getElementById('generic-sheet-content');
+    sheet.innerHTML = `
+        <h3>Asignar a ${name}</h3>
+        <input type="number" id="new-ass" class="form-input" value="${val}" step="0.01">
+        <button class="btn-save" onclick="finishAssign('${id}')">Confirmar</button>
+    `;
+    document.getElementById('overlay-generic').classList.add('open');
+}
+
+function finishAssign(id) {
     const mStr = getMStr(state.currentMonthDate);
     if(!state.assignments[mStr]) state.assignments[mStr] = {};
-    state.assignments[mStr][activeCatId] = parseFloat(document.getElementById('inp-amount').value) || 0;
-    document.getElementById('overlay-assign').classList.remove('open');
+    state.assignments[mStr][id] = parseFloat(document.getElementById('new-ass').value) || 0;
+    document.getElementById('overlay-generic').classList.remove('open');
     save();
+}
+
+// Funciones de utilidad para el resto de botones
+function openAccountSheet() {
+    const sheet = document.getElementById('generic-sheet-content');
+    sheet.innerHTML = `
+        <h3>Nueva Cuenta</h3>
+        <input type="text" id="a-emoji" class="form-input" placeholder="Emoji">
+        <input type="text" id="a-name" class="form-input" placeholder="Nombre">
+        <input type="number" id="a-bal" class="form-input" placeholder="Saldo inicial">
+        <button class="btn-save" onclick="state.accounts.push({id:'a'+Date.now(), name:document.getElementById('a-name').value, emoji:document.getElementById('a-emoji').value||'🏦'}); let b=parseFloat(document.getElementById('a-bal').value); if(b) state.transactions.push({type:'income', concept:'Saldo inicial', amount:b, date:new Date().toISOString().split('T')[0], accountId:'a'+(Date.now()-1)}); document.getElementById('overlay-generic').classList.remove('open'); save();">Crear</button>
+    `;
+    document.getElementById('overlay-generic').classList.add('open');
+}
+
+function openAddCatDialog(gid) {
+    const sheet = document.getElementById('generic-sheet-content');
+    sheet.innerHTML = `
+        <h3>Nueva Categoría</h3>
+        <input type="text" id="c-emoji" class="form-input" placeholder="Emoji">
+        <input type="text" id="c-name" class="form-input" placeholder="Nombre">
+        <button class="btn-save" onclick="state.groups.find(g=>g.id==='${gid}').cats.push({id:'c'+Date.now(), name:document.getElementById('c-name').value, emoji:document.getElementById('c-emoji').value||'📌'}); document.getElementById('overlay-generic').classList.remove('open'); save();">Añadir</button>
+    `;
+    document.getElementById('overlay-generic').classList.add('open');
+}
+
+function openGroupSheet() {
+    const sheet = document.getElementById('generic-sheet-content');
+    sheet.innerHTML = `
+        <h3>Nuevo Grupo</h3>
+        <input type="text" id="g-name" class="form-input" placeholder="Nombre">
+        <button class="btn-save" onclick="state.groups.push({id:'g'+Date.now(), name:document.getElementById('g-name').value, cats:[]}); document.getElementById('overlay-generic').classList.remove('open'); save();">Crear</button>
+    `;
+    document.getElementById('overlay-generic').classList.add('open');
 }
 
 function openTxSheet() {
-    const accS = document.getElementById('tx-account'); accS.innerHTML = '';
-    state.accounts.forEach(a => accS.innerHTML += `<option value="${a.id}">${a.name}</option>`);
-    const catS = document.getElementById('tx-category'); catS.innerHTML = '';
-    state.groups.forEach(g => g.cats.forEach(c => catS.innerHTML += `<option value="${c.id}">${g.name} > ${c.name}</option>`));
-    document.getElementById('tx-date').valueAsDate = new Date();
-    document.getElementById('overlay-tx').classList.add('open');
-}
-
-function saveTx() {
-    state.transactions.push({
-        type: currentTxType,
-        concept: document.getElementById('tx-concept').value,
-        amount: parseFloat(document.getElementById('tx-amount').value),
-        date: document.getElementById('tx-date').value,
-        accountId: document.getElementById('tx-account').value,
-        categoryId: document.getElementById('tx-category').value
-    });
-    document.getElementById('overlay-tx').classList.remove('open');
-    save();
-}
-
-let currentTxType = 'expense';
-function setTxType(t) {
-    currentTxType = t;
-    document.getElementById('btn-t-exp').style.background = t==='expense'?'#181715':'#fff';
-    document.getElementById('btn-t-exp').style.color = t==='expense'?'#fff':'#181715';
-    document.getElementById('btn-t-inc').style.background = t==='income'?'#181715':'#fff';
-    document.getElementById('btn-t-inc').style.color = t==='income'?'#fff':'#181715';
-    document.getElementById('tx-category').style.display = t==='expense'?'block':'none';
-}
-
-function openAccountSheet() { document.getElementById('overlay-account').classList.add('open'); }
-function saveNewAccount() {
-    const id = 'a' + Date.now();
-    state.accounts.push({ id, name: document.getElementById('acc-name').value, emoji: document.getElementById('acc-emoji').value || '🏦' });
-    const b = parseFloat(document.getElementById('acc-balance').value) || 0;
-    if(b!==0) state.transactions.push({ type:'income', concept:'Saldo Inicial', amount: b, date: new Date().toISOString().split('T')[0], accountId: id });
-    document.getElementById('overlay-account').classList.remove('open');
-    save();
-}
-
-function openGroupSheet() { document.getElementById('overlay-group').classList.add('open'); }
-function saveNewGroup() {
-    state.groups.push({ id: 'g'+Date.now(), name: document.getElementById('group-name').value, cats: [] });
-    document.getElementById('overlay-group').classList.remove('open');
-    save();
-}
-
-function openCatSheet(gid) { activeGroupId = gid; document.getElementById('overlay-cat').classList.add('open'); }
-function saveNewCat() {
-    const g = state.groups.find(x => x.id === activeGroupId);
-    g.cats.push({ id: 'c'+Date.now(), name: document.getElementById('cat-name').value, emoji: document.getElementById('cat-emoji').value || '📌' });
-    document.getElementById('overlay-cat').classList.remove('open');
-    save();
+    const sheet = document.getElementById('generic-sheet-content');
+    sheet.innerHTML = `
+        <h3>Nuevo Movimiento</h3>
+        <select id="t-type" class="form-input" onchange="document.getElementById('cat-sel').style.display = this.value==='expense'?'block':'none'"><option value="expense">Gasto</option><option value="income">Ingreso</option></select>
+        <input type="text" id="t-con" class="form-input" placeholder="Concepto">
+        <input type="number" id="t-amo" class="form-input" placeholder="0.00">
+        <input type="date" id="t-dat" class="form-input">
+        <select id="t-acc" class="form-input">${state.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select>
+        <select id="cat-sel" class="form-input">${state.groups.flatMap(g=>g.cats).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select>
+        <button class="btn-save" onclick="state.transactions.push({type:document.getElementById('t-type').value, concept:document.getElementById('t-con').value, amount:parseFloat(document.getElementById('t-amo').value), date:document.getElementById('t-dat').value, accountId:document.getElementById('t-acc').value, categoryId:document.getElementById('cat-sel').value}); document.getElementById('overlay-generic').classList.remove('open'); save();">Guardar</button>
+    `;
+    document.getElementById('t-dat').valueAsDate = new Date();
+    document.getElementById('overlay-generic').classList.add('open');
 }
 
 function changeMonth(d) { state.currentMonthDate.setMonth(state.currentMonthDate.getMonth() + d); render(); }
@@ -378,7 +374,6 @@ function showPanel(id, btn) {
     btn.classList.add('active');
 }
 
-// Iniciar
 render();
 </script>
 </body>
