@@ -324,6 +324,13 @@
     font-family: 'Zen Kaku Gothic New', sans-serif;
     font-size: 15px; outline: none;
   }
+  select.form-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B6B65' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+  }
   .btn-save {
     width: 100%; background: var(--bg-banner);
     color: white; border: none; border-radius: 12px;
@@ -386,13 +393,25 @@
       <div id="budgetBody"></div>
     </div>
     
-    <div class="panel" id="panel-empty" style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px;">
-      Esta sección está vacía por ahora.
+    <div class="panel" id="panel-mov">
+      <div class="budget-col-header">
+        <span class="bch">Fecha y Concepto</span>
+        <span class="bch" style="text-align: right; grid-column: span 2;">Importe</span>
+      </div>
+      <div id="txBody"></div>
+    </div>
+
+    <div class="panel" id="panel-goals" style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px;">
+      Tus metas financieras aparecerán aquí.
+    </div>
+
+    <div class="panel" id="panel-reports" style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px;">
+      Los gráficos e informes estarán disponibles pronto.
     </div>
   </div>
 
   <!-- FAB -->
-  <button class="fab" onclick="openSheet()">+</button>
+  <button class="fab" onclick="openTxSheet()">+</button>
 
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
@@ -400,15 +419,15 @@
       <span class="nav-icon">⊞</span>
       <span class="nav-label">Plan</span>
     </button>
-    <button class="nav-tab" onclick="showPanel('empty', this)">
+    <button class="nav-tab" onclick="showPanel('mov', this)">
       <span class="nav-icon">≡</span>
       <span class="nav-label">Movimientos</span>
     </button>
-    <button class="nav-tab" onclick="showPanel('empty', this)">
+    <button class="nav-tab" onclick="showPanel('goals', this)">
       <span class="nav-icon">◎</span>
       <span class="nav-label">Metas</span>
     </button>
-    <button class="nav-tab" onclick="showPanel('empty', this)">
+    <button class="nav-tab" onclick="showPanel('reports', this)">
       <span class="nav-icon">▦</span>
       <span class="nav-label">Informes</span>
     </button>
@@ -426,11 +445,36 @@
   </div>
 </div>
 
+<!-- OVERLAY SHEET PARA NUEVO MOVIMIENTO -->
+<div class="overlay" id="overlay-tx" onclick="closeTxSheet(event)">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <h3 style="font-family: 'Cormorant Garamond'; margin-bottom: 20px; font-weight: 400; font-size: 22px;">Nuevo Movimiento</h3>
+    
+    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+      <button id="btn-type-exp" onclick="setTxType('expense')" style="flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-main); font-family: 'Zen Kaku Gothic New', sans-serif;">Gasto</button>
+      <button id="btn-type-inc" onclick="setTxType('income')" style="flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--bg-list-header); color:var(--text-muted); font-family: 'Zen Kaku Gothic New', sans-serif;">Ingreso</button>
+    </div>
+
+    <div id="tx-error" style="color: var(--aka); font-size: 13px; margin-bottom: 10px; display: none;"></div>
+    
+    <input type="date" id="tx-date" class="form-input">
+    <input type="text" id="tx-concept" class="form-input" placeholder="Concepto (ej. Supermercado)">
+    <input type="number" id="tx-amount" class="form-input" placeholder="Importe €" step="0.01">
+    
+    <select id="tx-category" class="form-input">
+      <option value="">Selecciona una categoría...</option>
+    </select>
+
+    <button class="btn-save" onclick="saveTx()">Guardar Movimiento</button>
+  </div>
+</div>
+
 <script>
 // ESTADO INICIAL A CERO
 const state = {
   month: new Date(2026, 1, 1), // Febrero 2026
   income: 0,
+  transactions: [],
   groups: [
     { id:'g1', name:'Gastos esenciales', open:true, cats:[
       { id:'c1', name:'Alquiler',          emoji:'🏠', assigned:0, spent:0 },
@@ -580,10 +624,173 @@ function saveEdit() {
   closeSheet();
 }
 
+/* LOGICA DE MOVIMIENTOS */
+let currentTxType = 'expense';
+
+function setTxType(type) {
+  currentTxType = type;
+  const btnExp = document.getElementById('btn-type-exp');
+  const btnInc = document.getElementById('btn-type-inc');
+  const catSelect = document.getElementById('tx-category');
+  
+  document.getElementById('tx-error').style.display = 'none';
+
+  if (type === 'expense') {
+    btnExp.style.background = 'var(--aka)';
+    btnExp.style.color = 'white';
+    btnExp.style.borderColor = 'var(--aka)';
+    btnInc.style.background = 'var(--bg-list-header)';
+    btnInc.style.color = 'var(--text-muted)';
+    btnInc.style.borderColor = 'var(--border)';
+    catSelect.style.display = 'block';
+  } else {
+    btnInc.style.background = 'var(--bg-banner)';
+    btnInc.style.color = 'white';
+    btnInc.style.borderColor = 'var(--bg-banner)';
+    btnExp.style.background = 'var(--bg-list-header)';
+    btnExp.style.color = 'var(--text-muted)';
+    btnExp.style.borderColor = 'var(--border)';
+    catSelect.style.display = 'none';
+  }
+}
+
+function openTxSheet() {
+  document.getElementById('tx-date').valueAsDate = new Date();
+  document.getElementById('tx-concept').value = '';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-error').style.display = 'none';
+  
+  const catSelect = document.getElementById('tx-category');
+  catSelect.innerHTML = '<option value="">Selecciona una categoría...</option>';
+  for(const g of state.groups) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = g.name;
+    for(const cat of g.cats) {
+      const opt = document.createElement('option');
+      opt.value = cat.id;
+      opt.textContent = `${cat.emoji} ${cat.name}`;
+      optgroup.appendChild(opt);
+    }
+    catSelect.appendChild(optgroup);
+  }
+  
+  setTxType('expense');
+  document.getElementById('overlay-tx').classList.add('open');
+}
+
+function closeTxSheet(e) {
+  if(!e || e.target.id === 'overlay-tx') {
+    document.getElementById('overlay-tx').classList.remove('open');
+  }
+}
+
+function saveTx() {
+  const concept = document.getElementById('tx-concept').value.trim();
+  const amount = parseFloat(document.getElementById('tx-amount').value);
+  const date = document.getElementById('tx-date').value;
+  const catId = document.getElementById('tx-category').value;
+  const errBox = document.getElementById('tx-error');
+
+  if (!concept || isNaN(amount) || amount <= 0) {
+    errBox.textContent = "Por favor, introduce un concepto y un importe válido.";
+    errBox.style.display = 'block';
+    return;
+  }
+
+  if (currentTxType === 'expense' && !catId) {
+    errBox.textContent = "Por favor, selecciona una categoría para el gasto.";
+    errBox.style.display = 'block';
+    return;
+  }
+
+  errBox.style.display = 'none';
+
+  const tx = {
+    id: 'tx-' + Date.now(),
+    type: currentTxType,
+    concept,
+    amount,
+    date,
+    categoryId: currentTxType === 'expense' ? catId : null
+  };
+
+  state.transactions.push(tx);
+  state.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  if (currentTxType === 'expense') {
+    for(const g of state.groups) {
+      const cat = g.cats.find(c => c.id === catId);
+      if (cat) {
+        cat.spent += amount;
+        break;
+      }
+    }
+  } else {
+    state.income += amount;
+  }
+
+  renderBudget();
+  renderTransactions();
+  closeTxSheet();
+}
+
+function renderTransactions() {
+  const body = document.getElementById('txBody');
+  body.innerHTML = '';
+
+  if (state.transactions.length === 0) {
+    body.innerHTML = '<div style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px;">Aún no hay movimientos registrados.</div>';
+    return;
+  }
+
+  for(const tx of state.transactions) {
+    let catName = 'Ingreso';
+    let catEmoji = '💰';
+    let amountClass = 'pos';
+    let prefix = '+';
+
+    if (tx.type === 'expense') {
+      amountClass = 'neg';
+      prefix = '-';
+      for(const g of state.groups) {
+        const cat = g.cats.find(c => c.id === tx.categoryId);
+        if(cat) {
+          catName = cat.name;
+          catEmoji = cat.emoji;
+          break;
+        }
+      }
+    }
+
+    const dateObj = new Date(tx.date);
+    const dateStr = dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    const row = document.createElement('div');
+    row.className = 'cat-row';
+    row.style.gridTemplateColumns = '1fr auto';
+    
+    row.innerHTML = `
+      <div class="cat-info">
+        <span class="cat-emo">${catEmoji}</span>
+        <div class="cat-text">
+          <div class="cat-name-text" style="font-weight: 500;">${tx.concept}</div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${dateStr} · ${catName}</div>
+        </div>
+      </div>
+      <div class="cat-avail ${amountClass}" style="font-size: 16px; align-self: center;">
+        ${prefix}€${tx.amount.toFixed(2).replace('.',',')}
+      </div>
+    `;
+    body.appendChild(row);
+  }
+}
+
 // Inicializar
 updateMonth();
 renderBudget();
+renderTransactions();
 </script>
 </body>
 </html>
+
 
