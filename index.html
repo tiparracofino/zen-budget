@@ -136,7 +136,7 @@
 
 <script>
 // --- DATA ---
-const STORAGE_KEY = 'MA_DATA_V4';
+const STORAGE_KEY = 'MA_DATA_V5';
 let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
     month: new Date().toISOString(),
     transactions: [],
@@ -181,7 +181,7 @@ function render() {
     const mStr = getMStr(state.currentMonthDate);
     document.getElementById('monthLabel').textContent = MONTHS[state.currentMonthDate.getMonth()] + ' ' + state.currentMonthDate.getFullYear();
 
-    // 1. Plan (Presupuesto con colapsables)
+    // 1. Plan
     const budgetPanel = document.getElementById('panel-budget');
     budgetPanel.innerHTML = '';
     let tSpent = 0, tAssigned = 0;
@@ -206,7 +206,7 @@ function render() {
         budgetPanel.appendChild(list);
     });
 
-    // 2. Gestionar (Con Swipe bidireccional)
+    // 2. Estructura (Categorías y Grupos)
     const structPanel = document.getElementById('manage-structure-list');
     structPanel.innerHTML = '';
     state.groups.forEach(g => {
@@ -227,7 +227,7 @@ function render() {
         });
     });
 
-    // Cuentas
+    // 3. Cuentas (Con Swipe Bidireccional)
     const accPanel = document.getElementById('manage-accounts-list');
     accPanel.innerHTML = '';
     let net = 0;
@@ -254,16 +254,28 @@ function render() {
     document.getElementById('toAssignVal').textContent = fmt(totalIn - totalAssignedGlobal);
 }
 
-// --- ACCIONES MODALES ---
-function toggleGroup(id) { let g = state.groups.find(x=>x.id===id); g.open = !g.open; render(); }
-
-function openAssignDialog(id, name, val) {
+// --- MODALES CUENTAS ---
+function openEditAcc(id) {
+    const acc = state.accounts.find(a => a.id === id);
     const m = document.getElementById('modal-content');
-    m.innerHTML = `<h3>${name}</h3><input type="number" id="in-a" class="form-input" value="${val}"><button class="btn-save" onclick="state.assignments[getMStr(state.currentMonthDate)]['${id}'] = parseFloat(document.getElementById('in-a').value)||0; document.getElementById('overlay-main').classList.remove('open'); save();">Asignar</button>`;
-    if(!state.assignments[getMStr(state.currentMonthDate)]) state.assignments[getMStr(state.currentMonthDate)] = {};
+    m.innerHTML = `<h3>Editar Cuenta</h3>
+        <input id="e-ac-em" class="form-input" value="${acc.emoji}">
+        <input id="e-ac-na" class="form-input" value="${acc.name}">
+        <button class="btn-save" onclick="updateAcc('${id}')">Guardar</button>`;
     document.getElementById('overlay-main').classList.add('open');
 }
+function updateAcc(id) {
+    const acc = state.accounts.find(a => a.id === id);
+    acc.emoji = document.getElementById('e-ac-em').value;
+    acc.name = document.getElementById('e-ac-na').value;
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+function deleteAcc(id) {
+    if(state.transactions.some(t => t.accountId === id)) return showToast("No se puede: tiene movimientos");
+    state.accounts = state.accounts.filter(a => a.id !== id); save();
+}
 
+// --- MODALES CATEGORÍAS ---
 function openEditCat(id) {
     let c = null; state.groups.forEach(g=> { let f = g.cats.find(x=>x.id===id); if(f) c=f; });
     const m = document.getElementById('modal-content');
@@ -273,6 +285,28 @@ function openEditCat(id) {
 function updateCat(id) {
     state.groups.forEach(g=> { let c = g.cats.find(x=>x.id===id); if(c){ c.emoji=document.getElementById('e-em').value; c.name=document.getElementById('e-na').value; } });
     document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+// --- MODALES GRUPOS ---
+function openEditGroup(id) {
+    const g = state.groups.find(x => x.id === id);
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>Editar Grupo</h3><input id="e-gr-na" class="form-input" value="${g.name}"><button class="btn-save" onclick="updateGroup('${id}')">Guardar</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+function updateGroup(id) {
+    state.groups.find(x => x.id === id).name = document.getElementById('e-gr-na').value;
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+// --- OTROS MODALES ---
+function toggleGroup(id) { let g = state.groups.find(x=>x.id===id); g.open = !g.open; render(); }
+
+function openAssignDialog(id, name, val) {
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>${name}</h3><input type="number" id="in-a" class="form-input" value="${val}"><button class="btn-save" onclick="state.assignments[getMStr(state.currentMonthDate)]['${id}'] = parseFloat(document.getElementById('in-a').value)||0; document.getElementById('overlay-main').classList.remove('open'); save();">Asignar</button>`;
+    if(!state.assignments[getMStr(state.currentMonthDate)]) state.assignments[getMStr(state.currentMonthDate)] = {};
+    document.getElementById('overlay-main').classList.add('open');
 }
 
 function deleteCat(id) {
@@ -291,7 +325,6 @@ function addCat(gid) {
     document.getElementById('overlay-main').classList.remove('open'); save();
 }
 
-// (Misma lógica simplificada para Cuentas y Grupos...)
 function openAccountSheet() {
     document.getElementById('modal-content').innerHTML = `<h3>Nueva Cuenta</h3><input id="na-em" class="form-input" placeholder="Emoji"><input id="na-na" class="form-input" placeholder="Nombre"><input id="na-ba" type="number" class="form-input" placeholder="Saldo inicial"><button class="btn-save" onclick="addAcc()">Crear</button>`;
     document.getElementById('overlay-main').classList.add('open');
