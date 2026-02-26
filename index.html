@@ -1,17 +1,419 @@
-function deleteAcc(id) {
-    // 1. Comprobamos si hay movimientos vinculados a esta cuenta
-    const hasTransactions = state.transactions.some(t => t.accountId === id);
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>間 — Ma Budget</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Zen+Kaku+Gothic+New:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #181715;
+    --bg-pill: #2C2B28;
+    --text-gold: #C2A878;
+    --text-green: #8DA980;
+    --bg-banner: #4B6342;
+    --text-banner-light: #C8D8BF;
+    --bg-list-header: #EBE6DA;
+    --bg-card: #FDFBF7;
+    --text-main: #1C1C1A;
+    --text-muted: #6B6B65;
+    --border: rgba(28,28,26,0.06);
+    --aka: #B04A4A;
+    --edit-blue: #C2A878;
+  }
 
-    if (hasTransactions) {
-        // 2. Si tiene movimientos, pedimos confirmación al usuario
-        const confirmDelete = confirm("Esta cuenta tiene movimientos. Si la borras, también se borrará su historial. ¿Estás seguro?");
-        if (!confirmDelete) return; // Si el usuario cancela, detenemos la función
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Zen Kaku Gothic New', sans-serif; background: var(--bg-list-header); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+  .app { display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; background: var(--bg-list-header); position: relative; }
+
+  /* ── HEADER ── */
+  .top-header { background: var(--bg-dark); padding: 48px 20px 16px; flex-shrink: 0; }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .logo { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--text-gold); letter-spacing: 0.12em; }
+  .month-nav { display: flex; align-items: center; background: var(--bg-pill); border-radius: 20px; padding: 2px 4px; }
+  .month-btn { background: none; border: none; color: rgba(255,255,255,0.5); width: 30px; height: 30px; font-size: 16px; cursor: pointer; }
+  .month-label { font-size: 13px; color: rgba(255,255,255,0.85); min-width: 100px; text-align: center; }
+  
+  .summary-pills { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .pill { background: var(--bg-pill); border-radius: 12px; padding: 12px 8px; text-align: center; }
+  .pill-label { font-size: 8px; text-transform: uppercase; color: rgba(255,255,255,0.4); margin-bottom: 4px; display: block; }
+  .pill-value { font-family: 'Cormorant Garamond', serif; font-size: 16px; color: rgba(255,255,255,0.85); }
+  .pill-value.neg-red { color: var(--aka) !important; font-weight: 600; }
+
+  .assign-banner { background: var(--bg-banner); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .assign-value { font-family: 'Cormorant Garamond', serif; font-size: 24px; color: var(--text-banner-light); }
+
+  /* ── CONTENT ── */
+  .content { flex: 1; overflow-y: auto; padding-bottom: 100px; -webkit-overflow-scrolling: touch; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* ── SWIPE GESTURES ── */
+  .swipe-container { position: relative; overflow: hidden; background: var(--bg-card); border-bottom: 1px solid var(--border); touch-action: pan-y; }
+  .swipe-actions { position: absolute; inset: 0; display: flex; justify-content: space-between; align-items: stretch; }
+  .action-edit { background: var(--edit-blue); color: white; width: 80px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; cursor: pointer; user-select: none; }
+  .action-delete { background: var(--aka); color: white; width: 80px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; cursor: pointer; user-select: none; }
+  .swipe-content { position: relative; z-index: 2; background: var(--bg-card); padding: 16px 20px; display: flex; align-items: center; transition: transform 0.3s ease; }
+
+  /* ── ROWS & GROUPS ── */
+  .group-header { background: var(--bg-list-header); padding: 12px 20px; font-size: 10px; text-transform: uppercase; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; font-weight: 700; letter-spacing: 0.1em; cursor: pointer; }
+  .group-header .chevron { transition: transform 0.2s; }
+  .group-header.closed .chevron { transform: rotate(-90deg); }
+  .cat-list.hidden { display: none; }
+  
+  .row-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+  .val-box { text-align: right; min-width: 70px; }
+
+  /* ── NAV ── */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg-dark); display: flex; padding-bottom: env(safe-area-inset-bottom); z-index: 50; }
+  .nav-tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 12px 0; color: rgba(255,255,255,0.4); background: none; border: none; cursor: pointer; }
+  .nav-tab.active { color: var(--text-gold); }
+  .nav-label { font-size: 8px; text-transform: uppercase; margin-top: 4px; }
+
+  .fab { position: fixed; bottom: 85px; right: 20px; width: 56px; height: 56px; background: var(--bg-banner); border-radius: 50%; color: white; font-size: 24px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 40; cursor: pointer; }
+
+  /* ── MODALS ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: flex-end; z-index: 100; }
+  .overlay.open { display: flex; }
+  .sheet { background: var(--bg-card); width: 100%; padding: 24px; border-radius: 20px 20px 0 0; }
+  .form-input { width: 100%; padding: 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 15px; transition: all 0.2s ease;}
+  .form-input:focus { outline: none; border-color: var(--text-gold); box-shadow: 0 0 0 2px rgba(194, 168, 120, 0.2); }
+  .btn-save { width: 100%; padding: 16px; background: var(--bg-banner); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; }
+
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--bg-dark); color: white; padding: 10px 20px; border-radius: 8px; opacity: 0; z-index: 200; pointer-events: none; transition: 0.3s; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="top-header">
+    <div class="top-bar">
+      <div class="logo">間 Ma</div>
+      <div class="month-nav">
+        <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+        <span class="month-label" id="monthLabel"></span>
+        <button class="month-btn" onclick="changeMonth(1)">›</button>
+      </div>
+      <div style="width:24px"></div>
+    </div>
+    <div class="summary-pills">
+      <div class="pill"><span class="pill-label">Asignado</span><span class="pill-value" id="s-assigned"></span></div>
+      <div class="pill"><span class="pill-label">Gastado</span><span class="pill-value" id="s-spent"></span></div>
+      <div class="pill"><span class="pill-label">Disponible</span><span class="pill-value" id="s-avail"></span></div>
+    </div>
+  </div>
+
+  <div class="assign-banner">
+    <div style="font-size: 9px; text-transform: uppercase; color: var(--text-banner-light); opacity: 0.7">Para asignar</div>
+    <div class="assign-value" id="toAssignVal"></div>
+  </div>
+
+  <div class="content">
+    <div class="panel active" id="panel-budget"></div>
+    <div class="panel" id="panel-mov"></div>
+    <div class="panel" id="panel-manage">
+      <div class="group-header">CUENTAS <button onclick="openAccountSheet()" style="color:var(--text-gold); border:none; background:none; font-size:16px; cursor:pointer">+</button></div>
+      <div id="manage-accounts-list"></div>
+      <div class="group-header">ESTRUCTURA <button onclick="openGroupSheet()" style="color:var(--text-gold); border:none; background:none; font-size:11px; cursor:pointer">+ GRUPO</button></div>
+      <div id="manage-structure-list"></div>
+    </div>
+  </div>
+
+  <button class="fab" onclick="openTxSheet()">+</button>
+  <nav class="bottom-nav">
+    <button class="nav-tab active" onclick="showPanel('budget', this)">⊞<span class="nav-label">Plan</span></button>
+    <button class="nav-tab" onclick="showPanel('mov', this)">≡<span class="nav-label">Mov</span></button>
+    <button class="nav-tab" onclick="showPanel('manage', this)">🏦<span class="nav-label">Gestionar</span></button>
+  </nav>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div class="overlay" id="overlay-main" onclick="this.classList.remove('open')">
+    <div class="sheet" onclick="event.stopPropagation()" id="modal-content"></div>
+</div>
+
+<script>
+// --- DATA ---
+const STORAGE_KEY = 'MA_DATA_V5';
+let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+    month: new Date().toISOString(),
+    transactions: [],
+    assignments: {},
+    accounts: [{ id: 'a1', name: 'Cuenta Principal', emoji: '🏦' }],
+    groups: [{ id: 'g1', name: 'Gastos Fijos', open: true, cats: [{ id: 'c1', name: 'Comida', emoji: '🛒' }] }]
+};
+state.currentMonthDate = new Date(state.month);
+
+function save() {
+    state.month = state.currentMonthDate.toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    render();
+}
+
+const fmt = (n) => (n < 0 ? '-' : '') + '€' + Math.abs(n).toFixed(2).replace('.', ',');
+const getMStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function showToast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2000); }
+
+// --- SWIPE LOGIC (SOLO GESTIONAR) ---
+let startX = 0, currentX = 0, activeEl = null;
+
+function ts(e) { startX = e.touches[0].clientX; activeEl = e.currentTarget.querySelector('.swipe-content'); activeEl.style.transition = 'none'; }
+function tm(e) { 
+    if(!activeEl) return;
+    currentX = e.touches[0].clientX - startX;
+    if(Math.abs(currentX) > 10) activeEl.style.transform = `translateX(${Math.max(-80, Math.min(80, currentX))}px)`;
+}
+function te() {
+    if(!activeEl) return;
+    activeEl.style.transition = 'transform 0.3s ease';
+    if(currentX > 40) activeEl.style.transform = 'translateX(80px)';
+    else if(currentX < -40) activeEl.style.transform = 'translateX(-80px)';
+    else activeEl.style.transform = 'translateX(0)';
+    activeEl = null;
+}
+
+// --- RENDER ---
+function render() {
+    const mStr = getMStr(state.currentMonthDate);
+    document.getElementById('monthLabel').textContent = MONTHS[state.currentMonthDate.getMonth()] + ' ' + state.currentMonthDate.getFullYear();
+
+    // 1. Plan
+    const budgetPanel = document.getElementById('panel-budget');
+    budgetPanel.innerHTML = '';
+    let tSpent = 0, tAssigned = 0;
+
+    state.groups.forEach(g => {
+        budgetPanel.innerHTML += `<div class="group-header ${g.open?'':'closed'}" onclick="toggleGroup('${g.id}')"><span><span class="chevron">▾</span> ${g.name}</span></div>`;
+        const list = document.createElement('div');
+        list.className = 'cat-list' + (g.open ? '' : ' hidden');
         
-        // 3. Si acepta, borramos todos los movimientos asociados a esa cuenta
+        g.cats.forEach(c => {
+            let ass = (state.assignments[mStr] && state.assignments[mStr][c.id]) || 0;
+            let spent = state.transactions.filter(t => t.categoryId === c.id && getMStr(new Date(t.date)) === mStr).reduce((a,b)=>a+b.amount,0);
+            tAssigned += ass; tSpent += spent;
+            let avail = ass - spent;
+            list.innerHTML += `
+                <div class="swipe-content" style="border-bottom:1px solid var(--border); cursor:pointer;" onclick="openAssignDialog('${c.id}','${c.name}',${ass})">
+                    <div class="row-info"><span>${c.emoji}</span><span>${c.name}</span></div>
+                    <div class="val-box" style="color:var(--text-muted); font-size:13px">${fmt(ass)}</div>
+                    <div class="val-box ${avail < 0 ? 'neg-red' : 'pos'}" style="font-size:14px; color:${avail < 0 ? 'var(--aka)':'var(--bg-banner)'}">${fmt(avail)}</div>
+                </div>`;
+        });
+        budgetPanel.appendChild(list);
+    });
+
+    // 2. Estructura (Categorías y Grupos)
+    const structPanel = document.getElementById('manage-structure-list');
+    structPanel.innerHTML = '';
+    state.groups.forEach(g => {
+        structPanel.innerHTML += `<div class="swipe-container" ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)">
+            <div class="swipe-actions"><div class="action-edit" onclick="openEditGroup('${g.id}')">EDITAR</div><div class="action-delete" onclick="deleteGroup('${g.id}')">BORRAR</div></div>
+            <div class="swipe-content" style="background:var(--bg-list-header); font-weight:700; font-size:11px">
+                <div class="row-info">${g.name}</div>
+                <button onclick="openAddCat('${g.id}')" style="background:none; border:none; color:var(--text-gold); cursor:pointer;">+ CAT</button>
+            </div>
+        </div>`;
+        
+        g.cats.forEach(c => {
+            structPanel.innerHTML += `
+                <div class="swipe-container" ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)">
+                    <div class="swipe-actions"><div class="action-edit" onclick="openEditCat('${c.id}')">EDITAR</div><div class="action-delete" onclick="deleteCat('${c.id}')">BORRAR</div></div>
+                    <div class="swipe-content"><div class="row-info">${c.emoji} ${c.name}</div></div>
+                </div>`;
+        });
+    });
+
+    // 3. Cuentas
+    const accPanel = document.getElementById('manage-accounts-list');
+    accPanel.innerHTML = '';
+    let net = 0;
+    state.accounts.forEach(a => {
+        let bal = state.transactions.filter(t=>t.accountId===a.id).reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount), 0);
+        net += bal;
+        accPanel.innerHTML += `<div class="swipe-container" ontouchstart="ts(event)" ontouchmove="tm(event)" ontouchend="te(event)">
+            <div class="swipe-actions"><div class="action-edit" onclick="openEditAcc('${a.id}')">EDITAR</div><div class="action-delete" onclick="deleteAcc('${a.id}')">BORRAR</div></div>
+            <div class="swipe-content"><div class="row-info">${a.emoji} ${a.name}</div><div class="val-box">${fmt(bal)}</div></div>
+        </div>`;
+    });
+
+    // Summary Top
+    document.getElementById('s-assigned').textContent = fmt(tAssigned);
+    document.getElementById('s-spent').textContent = fmt(tSpent);
+    const availFinal = tAssigned - tSpent;
+    const availEl = document.getElementById('s-avail');
+    availEl.textContent = fmt(availFinal);
+    availEl.className = 'pill-value ' + (availFinal < 0 ? 'neg-red' : '');
+
+    let totalIn = state.transactions.filter(t=>t.type==='income' && t.date <= mStr + '-31').reduce((a,b)=>a+b.amount, 0);
+    let totalAssignedGlobal = 0;
+    Object.keys(state.assignments).forEach(m => { if(m <= mStr) totalAssignedGlobal += Object.values(state.assignments[m]).reduce((a,b)=>a+b,0); });
+    document.getElementById('toAssignVal').textContent = fmt(totalIn - totalAssignedGlobal);
+}
+
+// --- RENDERIZAR PANEL DE MOVIMIENTOS ---
+function renderMovements() {
+    const movPanel = document.getElementById('panel-mov');
+    const mStr = getMStr(state.currentMonthDate);
+    
+    // Filtrar transacciones del mes actual
+    const monthTxs = state.transactions
+        .filter(t => getMStr(new Date(t.date)) === mStr)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    movPanel.innerHTML = monthTxs.length ? '' : '<div style="padding:40px; text-align:center; color:var(--text-muted)">No hay movimientos este mes</div>';
+
+    monthTxs.forEach(t => {
+        const acc = state.accounts.find(a => a.id === t.accountId);
+        const isExpense = t.type === 'expense';
+        
+        movPanel.innerHTML += `
+            <div class="swipe-container" style="background:var(--bg-card); border-bottom:1px solid var(--border); padding: 16px 20px; display: flex; align-items: center;">
+                <div class="row-info">
+                    <div style="display:flex; flex-direction:column">
+                        <span style="font-size:14px; color:var(--text-main)">${t.concept || 'Sin concepto'}</span>
+                        <span style="font-size:10px; color:var(--text-muted)">${t.date} • ${acc ? acc.name : 'Cuenta eliminada'}</span>
+                    </div>
+                </div>
+                <div class="val-box" style="font-size:14px; font-weight:500; color:${isExpense ? 'var(--aka)' : 'var(--bg-banner)'}">
+                    ${isExpense ? '-' : '+'}${fmt(t.amount)}
+                </div>
+            </div>`;
+    });
+}
+
+// --- MODALES CUENTAS ---
+function openEditAcc(id) {
+    const acc = state.accounts.find(a => a.id === id);
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>Editar Cuenta</h3>
+        <input id="e-ac-em" class="form-input" value="${acc.emoji}">
+        <input id="e-ac-na" class="form-input" value="${acc.name}">
+        <button class="btn-save" onclick="updateAcc('${id}')">Guardar</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+function updateAcc(id) {
+    const acc = state.accounts.find(a => a.id === id);
+    acc.emoji = document.getElementById('e-ac-em').value;
+    acc.name = document.getElementById('e-ac-na').value;
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+function deleteAcc(id) {
+    if (state.accounts.length <= 1) return showToast("Debes tener al menos una cuenta activa.");
+    
+    const hasTransactions = state.transactions.some(t => t.accountId === id);
+    if (hasTransactions) {
+        const confirmDelete = confirm("Esta cuenta tiene movimientos. Si la borras, también se borrará su historial. ¿Estás seguro?");
+        if (!confirmDelete) return;
         state.transactions = state.transactions.filter(t => t.accountId !== id);
     }
 
-    // 4. Finalmente, borramos la cuenta y guardamos
     state.accounts = state.accounts.filter(a => a.id !== id);
     save();
 }
+
+// --- MODALES CATEGORÍAS ---
+function openEditCat(id) {
+    let c = null; state.groups.forEach(g=> { let f = g.cats.find(x=>x.id===id); if(f) c=f; });
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>Editar Categoría</h3><input id="e-em" class="form-input" value="${c.emoji}"><input id="e-na" class="form-input" value="${c.name}"><button class="btn-save" onclick="updateCat('${id}')">Guardar</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+function updateCat(id) {
+    state.groups.forEach(g=> { let c = g.cats.find(x=>x.id===id); if(c){ c.emoji=document.getElementById('e-em').value; c.name=document.getElementById('e-na').value; } });
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+// --- MODALES GRUPOS ---
+function openEditGroup(id) {
+    const g = state.groups.find(x => x.id === id);
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>Editar Grupo</h3><input id="e-gr-na" class="form-input" value="${g.name}"><button class="btn-save" onclick="updateGroup('${id}')">Guardar</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+function updateGroup(id) {
+    state.groups.find(x => x.id === id).name = document.getElementById('e-gr-na').value;
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+// --- OTROS MODALES ---
+function toggleGroup(id) { let g = state.groups.find(x=>x.id===id); g.open = !g.open; render(); }
+
+function openAssignDialog(id, name, val) {
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>${name}</h3><input type="number" id="in-a" class="form-input" value="${val}"><button class="btn-save" onclick="state.assignments[getMStr(state.currentMonthDate)]['${id}'] = parseFloat(document.getElementById('in-a').value)||0; document.getElementById('overlay-main').classList.remove('open'); save();">Asignar</button>`;
+    if(!state.assignments[getMStr(state.currentMonthDate)]) state.assignments[getMStr(state.currentMonthDate)] = {};
+    document.getElementById('overlay-main').classList.add('open');
+}
+
+function deleteCat(id) {
+    if(state.transactions.some(t=>t.categoryId===id)) return showToast("No se puede: tiene movimientos");
+    state.groups.forEach(g=> { let idx = g.cats.findIndex(x=>x.id===id); if(idx!==-1) g.cats.splice(idx,1); });
+    save();
+}
+
+function openAddCat(gid) {
+    const m = document.getElementById('modal-content');
+    m.innerHTML = `<h3>Nueva Categoría</h3><input id="n-em" class="form-input" placeholder="Emoji"><input id="n-na" class="form-input" placeholder="Nombre"><button class="btn-save" onclick="addCat('${gid}')">Añadir</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+function addCat(gid) {
+    state.groups.find(x=>x.id===gid).cats.push({id:'c'+Date.now(), name:document.getElementById('n-na').value, emoji:document.getElementById('n-em').value||'📌'});
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+function openAccountSheet() {
+    document.getElementById('modal-content').innerHTML = `<h3>Nueva Cuenta</h3><input id="na-em" class="form-input" placeholder="Emoji"><input id="na-na" class="form-input" placeholder="Nombre"><input id="na-ba" type="number" class="form-input" placeholder="Saldo inicial"><button class="btn-save" onclick="addAcc()">Crear</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+function addAcc() {
+    let id = 'a'+Date.now(); let b = parseFloat(document.getElementById('na-ba').value);
+    state.accounts.push({id, name:document.getElementById('na-na').value, emoji:document.getElementById('na-em').value||'🏦'});
+    if(b) state.transactions.push({type:'income', concept:'Saldo inicial', amount:b, date:new Date().toISOString().split('T')[0], accountId:id});
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+function openTxSheet() {
+    document.getElementById('modal-content').innerHTML = `<h3>Movimiento</h3><select id="t-ty" class="form-input" onchange="document.getElementById('t-ca').style.display = this.value==='expense'?'block':'none'"><option value="expense">Gasto</option><option value="income">Ingreso</option></select><input id="t-co" class="form-input" placeholder="Concepto"><input id="t-am" type="number" class="form-input" placeholder="0.00"><input id="t-da" type="date" class="form-input"><select id="t-ac" class="form-input">${state.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}</select><select id="t-ca" class="form-input">${state.groups.flatMap(g=>g.cats).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select><button class="btn-save" onclick="addTx()">Guardar</button>`;
+    document.getElementById('t-da').valueAsDate = new Date();
+    document.getElementById('overlay-main').classList.add('open');
+}
+function addTx() {
+    state.transactions.push({type:document.getElementById('t-ty').value, concept:document.getElementById('t-co').value, amount:parseFloat(document.getElementById('t-am').value), date:document.getElementById('t-da').value, accountId:document.getElementById('t-ac').value, categoryId:document.getElementById('t-ca').value});
+    document.getElementById('overlay-main').classList.remove('open'); save();
+}
+
+function changeMonth(d) { state.currentMonthDate.setMonth(state.currentMonthDate.getMonth() + d); render(); }
+
+function showPanel(id, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('panel-'+id).classList.add('active');
+    btn.classList.add('active');
+    
+    if(id === 'mov') {
+        renderMovements();
+    } else {
+        render(); 
+    }
+}
+
+function openGroupSheet() {
+    document.getElementById('modal-content').innerHTML = `<h3>Nuevo Grupo</h3><input id="ng-na" class="form-input" placeholder="Nombre"><button class="btn-save" onclick="state.groups.push({id:'g'+Date.now(), name:document.getElementById('ng-na').value, open:true, cats:[]}); document.getElementById('overlay-main').classList.remove('open'); save();">Crear</button>`;
+    document.getElementById('overlay-main').classList.add('open');
+}
+
+function deleteGroup(id) {
+    let g = state.groups.find(x=>x.id===id);
+    if(g.cats.length > 0) return showToast("Borra primero las categorías");
+    state.groups = state.groups.filter(x=>x.id!==id); save();
+}
+
+render();
+</script>
+</body>
+</html>
