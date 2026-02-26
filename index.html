@@ -469,23 +469,33 @@
   </div>
 </div>
 
+<!-- OVERLAY SHEET PARA NUEVA CATEGORÍA -->
+<div class="overlay" id="overlay-cat" onclick="closeCatSheet(event)">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <h3 style="font-family: 'Cormorant Garamond'; margin-bottom: 20px; font-weight: 400; font-size: 22px;">Nueva Categoría</h3>
+    <input type="text" id="cat-emoji" class="form-input" placeholder="Emoji (ej. 🍔)" maxlength="2">
+    <input type="text" id="cat-name" class="form-input" placeholder="Nombre de la categoría">
+    <button class="btn-save" onclick="saveNewCat()">Crear Categoría</button>
+  </div>
+</div>
+
 <script>
 // ESTADO INICIAL A CERO
 const state = {
   month: new Date(2026, 1, 1), // Febrero 2026
-  income: 0,
   transactions: [],
+  assignments: {}, // Guarda lo asignado por mes: { '2026-02': { 'c1': 500 } }
   groups: [
     { id:'g1', name:'Gastos esenciales', open:true, cats:[
-      { id:'c1', name:'Alquiler',          emoji:'🏠', assigned:0, spent:0 },
-      { id:'c2', name:'Suministros',       emoji:'💡', assigned:0, spent:0 },
-      { id:'c3', name:'Supermercado',      emoji:'🛒', assigned:0, spent:0 },
-      { id:'c4', name:'Transporte',        emoji:'🚇', assigned:0, spent:0 },
-      { id:'c5', name:'Teléfono/Internet', emoji:'📡', assigned:0, spent:0 },
+      { id:'c1', name:'Alquiler',          emoji:'🏠' },
+      { id:'c2', name:'Suministros',       emoji:'💡' },
+      { id:'c3', name:'Supermercado',      emoji:'🛒' },
+      { id:'c4', name:'Transporte',        emoji:'🚇' },
+      { id:'c5', name:'Teléfono/Internet', emoji:'📡' },
     ]},
     { id:'g2', name:'Estilo de vida', open:true, cats:[
-      { id:'c6', name:'Restaurantes', emoji:'🍜', assigned:0, spent:0 },
-      { id:'c7', name:'Ocio',         emoji:'🎭', assigned:0, spent:0 },
+      { id:'c6', name:'Restaurantes', emoji:'🍜' },
+      { id:'c7', name:'Ocio',         emoji:'🎭' },
     ]}
   ]
 };
@@ -493,21 +503,99 @@ const state = {
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const fmt  = n => '€' + Math.abs(n).toFixed(2).replace('.',',');
 let editingCatId = null;
+let addingToGroupId = null;
+
+function getMonthStr(dateObj) {
+  return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}`;
+}
 
 function renderBudget() {
   const body = document.getElementById('budgetBody');
   body.innerHTML = '';
   
-  let totalAssigned = 0;
-  let totalSpent = 0;
+  const mStr = getMonthStr(state.month);
+  
+  let totalAssignedThisMonth = 0;
+  let totalSpentThisMonth = 0;
+  let totalIncomeAllTime = 0;
+  let totalAssignedAllTime = 0;
+
+  // Calcular ingresos globales (hasta el mes actual inclusive)
+  for(const tx of state.transactions) {
+    if(tx.type === 'income' && tx.date.substring(0,7) <= mStr) {
+      totalIncomeAllTime += tx.amount;
+    }
+  }
+
+  // Calcular asignaciones globales (hasta el mes actual inclusive)
+  for (const monthKey in state.assignments) {
+    if (monthKey <= mStr) {
+      for(const key in state.assignments[monthKey]) {
+        totalAssignedAllTime += state.assignments[monthKey][key];
+      }
+    }
+  }
+
+  const toAssign = totalIncomeAllTime - totalAssignedAllTime;
 
   for(const group of state.groups) {
-    const gAssigned = group.cats.reduce((s,c) => s + c.assigned, 0);
-    const gSpent    = group.cats.reduce((s,c) => s + c.spent, 0);
-    const gAvail    = gAssigned - gSpent;
-    
-    totalAssigned += gAssigned;
-    totalSpent += gSpent;
+    let gAssigned = 0;
+    let gSpent = 0;
+
+    const catRowsHTML = [];
+
+    for(const cat of group.cats) {
+      const assignedThisMonth = (state.assignments[mStr] && state.assignments[mStr][cat.id]) || 0;
+      
+      let spentThisMonth = 0;
+      let totalAssignedCat = 0;
+      let totalSpentCat = 0;
+
+      // Asignado histórico para esta categoría
+      for (const monthKey in state.assignments) {
+        if (monthKey <= mStr && state.assignments[monthKey][cat.id]) {
+          totalAssignedCat += state.assignments[monthKey][cat.id];
+        }
+      }
+
+      // Gastado histórico y de este mes para esta categoría
+      for(const tx of state.transactions) {
+        if (tx.type === 'expense' && tx.categoryId === cat.id && tx.date.substring(0,7) <= mStr) {
+          totalSpentCat += tx.amount;
+          if (tx.date.substring(0,7) === mStr) {
+            spentThisMonth += tx.amount;
+          }
+        }
+      }
+
+      const avail = totalAssignedCat - totalSpentCat;
+      const pct = assignedThisMonth > 0 ? Math.min((spentThisMonth / assignedThisMonth) * 100, 100) : 0;
+      
+      gAssigned += assignedThisMonth;
+      gSpent += spentThisMonth;
+
+      catRowsHTML.push(`
+        <div class="cat-row">
+          <div class="cat-info">
+            <span class="cat-emo">${cat.emoji}</span>
+            <div class="cat-text">
+              <div class="cat-name-text">${cat.name}</div>
+              <div class="cat-bar"><div class="cat-bar-fill ${avail < 0 ? 'over' : ''}" style="width:${pct}%"></div></div>
+            </div>
+          </div>
+          <div class="cat-assigned" onclick="editAssigned('${cat.id}', '${cat.name}', ${assignedThisMonth})">
+            €${assignedThisMonth.toFixed(2).replace('.',',')}
+          </div>
+          <div class="cat-avail ${avail>0 ? 'pos' : (avail<0 ? 'neg' : '')}">
+            €${avail.toFixed(2).replace('.',',')}
+          </div>
+        </div>
+      `);
+    }
+
+    totalAssignedThisMonth += gAssigned;
+    totalSpentThisMonth += gSpent;
+    const gAvail = gAssigned - gSpent;
 
     const wrapper = document.createElement('div');
     wrapper.innerHTML = `
@@ -516,48 +604,20 @@ function renderBudget() {
         <div class="group-num">€${gAssigned.toFixed(2).replace('.',',')}</div>
         <div class="group-num">€${gAvail.toFixed(2).replace('.',',')}</div>
       </div>
-      <div class="cat-rows ${group.open?'':'hidden'}" id="cr-${group.id}"></div>
+      <div class="cat-rows ${group.open?'':'hidden'}" id="cr-${group.id}">
+        ${catRowsHTML.join('')}
+        <div class="add-cat-row" onclick="openCatSheet('${group.id}')">+ añadir categoría</div>
+      </div>
     `;
     body.appendChild(wrapper);
-
-    const rows = wrapper.querySelector('.cat-rows');
-    for(const cat of group.cats) {
-      const avail = cat.assigned - cat.spent;
-      const pct   = cat.assigned > 0 ? Math.min((cat.spent / cat.assigned) * 100, 100) : 0;
-      
-      const row = document.createElement('div');
-      row.className = 'cat-row';
-      row.innerHTML = `
-        <div class="cat-info">
-          <span class="cat-emo">${cat.emoji}</span>
-          <div class="cat-text">
-            <div class="cat-name-text">${cat.name}</div>
-            <div class="cat-bar"><div class="cat-bar-fill" style="width:${pct}%"></div></div>
-          </div>
-        </div>
-        <div class="cat-assigned" onclick="editAssigned('${cat.id}', '${cat.name}', ${cat.assigned})">
-          €${cat.assigned.toFixed(2).replace('.',',')}
-        </div>
-        <div class="cat-avail ${avail>0 ? 'pos' : (avail<0 ? 'neg' : '')}">
-          €${avail.toFixed(2).replace('.',',')}
-        </div>
-      `;
-      rows.appendChild(row);
-    }
-
-    const addRow = document.createElement('div');
-    addRow.className = 'add-cat-row';
-    addRow.textContent = '+ añadir categoría';
-    rows.appendChild(addRow);
   }
 
   // Update Headers
-  const totalAvail = totalAssigned - totalSpent;
-  const toAssign = state.income - totalAssigned;
+  const totalAvailThisMonth = totalAssignedThisMonth - totalSpentThisMonth;
 
-  document.getElementById('s-assigned').textContent = fmt(totalAssigned);
-  document.getElementById('s-spent').textContent = fmt(totalSpent);
-  document.getElementById('s-avail').textContent = fmt(totalAvail);
+  document.getElementById('s-assigned').textContent = fmt(totalAssignedThisMonth);
+  document.getElementById('s-spent').textContent = fmt(totalSpentThisMonth);
+  document.getElementById('s-avail').textContent = fmt(totalAvailThisMonth);
   document.getElementById('toAssignVal').textContent = fmt(toAssign);
 }
 
@@ -576,6 +636,8 @@ function updateMonth() {
 function changeMonth(d) {
   state.month = new Date(state.month.getFullYear(), state.month.getMonth()+d, 1);
   updateMonth();
+  renderBudget();
+  renderTransactions();
 }
 
 function showPanel(id, btn) {
@@ -606,22 +668,40 @@ function editAssigned(id, name, currentAmount) {
 function saveEdit() {
   if (editingCatId) {
     const val = parseFloat(document.getElementById('inp-amount').value) || 0;
-    // Find category and update
-    for(const g of state.groups) {
-      const cat = g.cats.find(c => c.id === editingCatId);
-      if(cat) {
-        cat.assigned = val;
-        break;
-      }
-    }
-    renderBudget();
-  } else {
-    // Si no hay categoría editándose, asumimos que estamos añadiendo ingresos
-    const val = parseFloat(document.getElementById('inp-amount').value) || 0;
-    state.income += val;
+    const mStr = getMonthStr(state.month);
+    if (!state.assignments[mStr]) state.assignments[mStr] = {};
+    state.assignments[mStr][editingCatId] = val;
     renderBudget();
   }
   closeSheet();
+}
+
+/* LOGICA DE NUEVAS CATEGORIAS */
+function openCatSheet(groupId) {
+  addingToGroupId = groupId;
+  document.getElementById('cat-emoji').value = '';
+  document.getElementById('cat-name').value = '';
+  document.getElementById('overlay-cat').classList.add('open');
+}
+
+function closeCatSheet(e) {
+  if(!e || e.target.id === 'overlay-cat') {
+    document.getElementById('overlay-cat').classList.remove('open');
+    addingToGroupId = null;
+  }
+}
+
+function saveNewCat() {
+  const name = document.getElementById('cat-name').value.trim();
+  const emoji = document.getElementById('cat-emoji').value.trim() || '📌';
+  if(!name) return;
+
+  const group = state.groups.find(g => g.id === addingToGroupId);
+  if(group) {
+    group.cats.push({ id: 'c' + Date.now(), name, emoji });
+    renderBudget();
+  }
+  closeCatSheet();
 }
 
 /* LOGICA DE MOVIMIENTOS */
@@ -717,18 +797,6 @@ function saveTx() {
   state.transactions.push(tx);
   state.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  if (currentTxType === 'expense') {
-    for(const g of state.groups) {
-      const cat = g.cats.find(c => c.id === catId);
-      if (cat) {
-        cat.spent += amount;
-        break;
-      }
-    }
-  } else {
-    state.income += amount;
-  }
-
   renderBudget();
   renderTransactions();
   closeTxSheet();
@@ -737,13 +805,16 @@ function saveTx() {
 function renderTransactions() {
   const body = document.getElementById('txBody');
   body.innerHTML = '';
+  
+  const mStr = getMonthStr(state.month);
+  const currentMonthTxs = state.transactions.filter(t => t.date.substring(0,7) === mStr);
 
-  if (state.transactions.length === 0) {
-    body.innerHTML = '<div style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px;">Aún no hay movimientos registrados.</div>';
+  if (currentMonthTxs.length === 0) {
+    body.innerHTML = '<div style="padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 14px;">Aún no hay movimientos registrados en este mes.</div>';
     return;
   }
 
-  for(const tx of state.transactions) {
+  for(const tx of currentMonthTxs) {
     let catName = 'Ingreso';
     let catEmoji = '💰';
     let amountClass = 'pos';
@@ -792,5 +863,6 @@ renderTransactions();
 </script>
 </body>
 </html>
+
 
 
