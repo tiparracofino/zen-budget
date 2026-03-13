@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!-- viewport-fit=cover es crucial para que el iPhone detecte los bordes reales de la pantalla -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -25,7 +26,7 @@
   --red-alert-shadow: rgba(255, 59, 48, 0.35);
 
   --text-1:#3D3930; --text-2:#7D776D; --text-3:#AAA49A; --text-inv:#FDFCFA;
-  --glass:rgba(239,236,230,0.7); --glass-border:rgba(255,255,255,0.5); --glass-heavy:rgba(239,236,230,0.92);
+  --glass:rgba(239,236,230,0.75); --glass-border:rgba(255,255,255,0.5); --glass-heavy:rgba(239,236,230,0.92);
   --r-xs:12px; --r-sm:16px; --r-md:24px; --r-lg:32px; --r-pill:100px;
   --f-display:'Fraunces',serif; --f-body:'Outfit',sans-serif;
   --ease:cubic-bezier(0.16,1,0.3,1); --spring:cubic-bezier(0.34,1.56,0.64,1);
@@ -46,7 +47,7 @@
   --red-alert-shadow: rgba(255, 69, 58, 0.3);
 
   --text-1:#E2DED6; --text-2:#8A857D; --text-3:#5C5850; --text-inv:#1A1D1E;
-  --glass:rgba(30,34,36,0.75); --glass-border:rgba(255,255,255,0.06); --glass-heavy:rgba(26,29,30,0.94);
+  --glass:rgba(30,34,36,0.85); --glass-border:rgba(255,255,255,0.06); --glass-heavy:rgba(26,29,30,0.94);
 }
 
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -99,7 +100,8 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
 .pill-val.r { color:var(--rose); }
 
 /* --- SCROLL & PANELS --- */
-#scroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding: 0 16px calc(100px + env(safe-area-inset-bottom)); }
+/* Aumentado el padding bottom del scroll para que el contenido no quede detrás de la barra */
+#scroll { flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; padding: 0 16px calc(110px + env(safe-area-inset-bottom)); }
 .panel { display:none; animation: rise 0.4s var(--ease) both; } 
 .panel.on { display:block; }
 @keyframes rise{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
@@ -226,15 +228,56 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
 .icon-btn { background:var(--surf-2); width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center; box-shadow:var(--neo-up-sm); color:var(--text-2); transition:all 0.15s; font-size: 14px;}
 .icon-btn:active { box-shadow:var(--neo-down); transform:scale(0.95);}
 
-/* --- NAV & FAB --- */
-#nav { position:fixed; bottom:0; left:0; right:0; background:var(--glass); backdrop-filter:blur(24px) saturate(1.4); -webkit-backdrop-filter:blur(24px) saturate(1.4); border-top:1px solid var(--glass-border); display:flex; z-index:90; padding-bottom:env(safe-area-inset-bottom); height: 64px; }
-.ntab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:var(--text-3); transition:all 0.2s var(--ease); }
+/* --- NAV & FAB (CORREGIDO PARA IPHONE) --- */
+#nav { 
+  position:fixed; 
+  bottom:0; 
+  left:0; 
+  right:0; 
+  background:var(--glass); 
+  backdrop-filter:blur(24px) saturate(1.4); 
+  -webkit-backdrop-filter:blur(24px) saturate(1.4); 
+  border-top:1px solid var(--glass-border); 
+  display:flex; 
+  z-index:90; 
+  /* padding-bottom añade dinámicamente el área segura de la barra del iPhone */
+  padding-bottom:env(safe-area-inset-bottom); 
+}
+.ntab { 
+  flex:1; 
+  display:flex; 
+  flex-direction:column; 
+  align-items:center; 
+  justify-content:center; 
+  gap:4px; 
+  color:var(--text-3); 
+  transition:all 0.2s var(--ease); 
+  /* Quitada la altura fija (height), ahora usa paddings */
+  padding: 14px 0 10px 0; 
+}
 .ntab.on { color:var(--blue); }
 .ntab:active { transform:scale(0.9); }
 .nicon { font-size:20px; line-height:1; margin-bottom:2px;} 
 .nlbl { font-size:0.6rem; font-weight:700; letter-spacing:0.05em; }
 
-#fab { position:fixed; right:20px; bottom:calc(80px + env(safe-area-inset-bottom)); width:52px; height:52px; background:linear-gradient(145deg, var(--blue), var(--blue-deep)); border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--text-inv); cursor:pointer; z-index:95; box-shadow: 3px 3px 12px rgba(90,130,160,0.4), -2px -2px 8px rgba(122,155,179,0.15); transition:transform 0.2s var(--spring); }
+#fab { 
+  position:fixed; 
+  right:20px; 
+  /* Ajustada la posición del FAB para que respete la altura de la nueva barra + safe area */
+  bottom:calc(90px + env(safe-area-inset-bottom)); 
+  width:52px; 
+  height:52px; 
+  background:linear-gradient(145deg, var(--blue), var(--blue-deep)); 
+  border-radius:50%; 
+  display:flex; 
+  align-items:center; 
+  justify-content:center; 
+  color:var(--text-inv); 
+  cursor:pointer; 
+  z-index:95; 
+  box-shadow: 3px 3px 12px rgba(90,130,160,0.4), -2px -2px 8px rgba(122,155,179,0.15); 
+  transition:transform 0.2s var(--spring); 
+}
 #fab:active { transform:scale(0.85); }
 #fab svg { width:24px; height:24px; }
 
@@ -1117,15 +1160,11 @@ function renderGoals() {
   body.innerHTML = S.goals.map(g => {
     const pct = Math.min(g.saved / g.target * 100, 100);
     const rem = g.target - g.saved;
-    
-    // Calcular meses restantes desde el mes de la vista actual (en lugar de la fecha real de hoy)
     const td = new Date(g.date+'-01');
     const viewYear = currentMonth.getFullYear();
     const viewMonth = currentMonth.getMonth();
     const ml = Math.max(1, (td.getFullYear() - viewYear) * 12 + td.getMonth() - viewMonth);
-    
     const mon = rem > 0 ? (rem/ml).toFixed(0) : 0;
-    
     return `<div class="goal-card" onclick="openEditGoal('${g.id}')">
       <div class="goal-top2"><div class="goal-emo">${g.emoji}</div><span class="gbadge ${g.type}">${lbl[g.type]}</span></div>
       <div class="goal-name">${g.name}</div>
