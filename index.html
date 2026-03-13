@@ -589,7 +589,7 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
     <div class="sheet-body">
       <div style="font-size:0.95rem;color:var(--text-2);line-height:1.7;margin-bottom:20px; font-weight:500;">
         Pulsa el botón flotante y selecciona <strong>Ingreso</strong> para registrar tu nómina o dinero recibido.<br><br>
-        El importe <em>Para asignar</em> es una piscina global. Refleja el dinero físico real que tienes en tu cuenta, menos lo que ya has asignado en sobres (categorías) este mes o meses futuros. Exactamente como funciona YNAB.
+        El importe <em>Para asignar</em> es una piscina global. Refleja el dinero físico real que tienes en tu cuenta, menos lo que ya has asignado en sobres (categorías) este mes o meses futuros. Las categorías en negativo (sobregasto) se deducen automáticamente en el mes siguiente. Exactamente como funciona YNAB.
       </div>
     </div>
     <div class="btn-row"><button class="btn btn-fill" onclick="closeSh('income'); openSh('tx');">Añadir ingreso ahora</button></div>
@@ -724,39 +724,19 @@ function confirmReset() {
   }
 }
 
-// --- CORE LOGIC ---
+// --- MOTOR MATEMÁTICO YNAB (Mes a Mes Secuencial) ---
 function getMonthData(mk) {
   if (!S.monthData) S.monthData = {};
   if (!S.monthData[mk]) S.monthData[mk] = { assignments: {} };
   return S.monthData[mk];
 }
-
-// 1. Calcula el Disponible real de una categoría arrastrando saldos mes a mes
-function getCatAvail(catId, upToMk) {
-  let assigned = 0;
-  let spent = 0;
-  if (S.monthData) {
-    Object.keys(S.monthData).forEach(m => {
-      if (m <= upToMk) {
-        assigned += (S.monthData[m].assignments[catId] || 0);
-      }
-    });
-  }
-  if (S.txs) {
-    S.txs.forEach(t => {
-      if (t.cat === catId && t.type === 'expense' && t.month <= upToMk) {
-        spent += t.amt;
-      }
-    });
-  }
-  return assigned - spent;
-}
-
 function getMonthSpent(mk) {
   const spent = {};
-  S.txs.filter(t => t.month === mk && t.type === 'expense').forEach(t => {
-    const key = t.cat || '_none';
-    spent[key] = (spent[key] || 0) + t.amt;
+  S.txs.forEach(t => {
+    if (t.month === mk && t.type === 'expense') {
+      const key = t.cat || '_none';
+      spent[key] = (spent[key] || 0) + t.amt;
+    }
   });
   return spent;
 }
@@ -764,36 +744,67 @@ function getTotalSpent(mk) {
   return S.txs.filter(t => t.month === mk && t.type === 'expense').reduce((s, t) => s + t.amt, 0);
 }
 
-// 2. Calcula el "Para Asignar" restando tu efectivo real menos lo que está reservado
-function calcToAssign(mk) {
-  // A. Todo tu efectivo físico recibido en la historia hasta este mes
-  const totalIncome = S.txs.filter(t => t.type === 'income' && t.month <= mk).reduce((s, t) => s + t.amt, 0);
-  const totalExpense = S.txs.filter(t => t.type === 'expense' && t.month <= mk).reduce((s, t) => s + t.amt, 0);
-  const totalCash = totalIncome - totalExpense;
+// Función maestra: Calcula el estado contable navegando cronológicamente mes a mes.
+function getMonthCalculations(targetMk) {
+  let monthsSet = new Set();
+  if (S.monthData) Object.keys(S.monthData).forEach(m => monthsSet.add(m));
+  if (S.txs) S.txs.forEach(t => monthsSet.add(t.month));
+  monthsSet.add(targetMk);
 
-  // B. Dinero bloqueado o reservado en tus "sobres" (categorías en positivo)
-  let positiveReserved = 0;
-  S.groups.forEach(g => {
-    g.cats.forEach(c => {
-      const avail = getCatAvail(c.id, mk);
-      if (avail > 0) positiveReserved += avail;
-    });
-  });
+  let months = Array.from(monthsSet).sort();
+  
+  let toAssign = 0;
+  let catAvail = {};
 
-  // C. Dinero que ya has pre-asignado a meses futuros
-  let futureAssignments = 0;
-  if (S.monthData) {
-    Object.keys(S.monthData).forEach(m => {
-      if (m > mk) {
-        Object.values(S.monthData[m].assignments || {}).forEach(v => {
-          futureAssignments += v;
-        });
+  for (let mk of months) {
+    let md = S.monthData[mk] || { assignments: {} };
+    
+    // 1. A principio de mes, los sobres en negativo (sobregasto) se resetean a 0
+    // y ese "agujero" se resta de tu dinero global "Para Asignar".
+    let prevOverspent = 0;
+    Object.keys(catAvail).forEach(cId => {
+      if (catAvail[cId] < 0) {
+        prevOverspent += Math.abs(catAvail[cId]);
+        catAvail[cId] = 0; 
       }
     });
-  }
+    toAssign -= prevOverspent;
 
-  // D. Dinero Libre = Efectivo - Sobres Positivos - Asignaciones Futuras
-  return totalCash - positiveReserved - futureAssignments;
+    // 2. Sumar transacciones del mes
+    let inc = 0;
+    let exp = {};
+    let uncategorizedExp = 0;
+
+    if (S.txs) {
+      S.txs.forEach(t => {
+        if (t.month === mk) {
+          if (t.type === 'income') inc += t.amt;
+          if (t.type === 'expense') {
+            if (t.cat) exp[t.cat] = (exp[t.cat] || 0) + t.amt;
+            else uncategorizedExp += t.amt; // Gasto sin categoría se come el ToAssign
+          }
+        }
+      });
+    }
+
+    // 3. Aplicar asignaciones del mes actual a los sobres
+    let assignedTotal = 0;
+    S.groups.forEach(g => {
+      g.cats.forEach(c => {
+        let a = md.assignments[c.id] || 0;
+        assignedTotal += a;
+        catAvail[c.id] = (catAvail[c.id] || 0) + a - (exp[c.id] || 0);
+      });
+    });
+
+    // 4. Actualizar "Para asignar" del mes
+    toAssign = toAssign + inc - assignedTotal - uncategorizedExp;
+
+    if (mk === targetMk) {
+      return { toAssign, catAvail };
+    }
+  }
+  return { toAssign: 0, catAvail: {} };
 }
 
 function ensureRecurringForMonth(mk) {
@@ -825,11 +836,13 @@ function ensureRecurringForMonth(mk) {
 function calcTotals() {
   const mk = monthKey(currentMonth);
   const md = getMonthData(mk);
+  const calc = getMonthCalculations(mk);
+
   const tIncMes = S.txs.filter(t => t.month === mk && t.type === 'income').reduce((s, t) => s + t.amt, 0);
   let assigned = 0;
   S.groups.forEach(g => g.cats.forEach(c => { assigned += (md.assignments[c.id] || 0); }));
   const totalSpent = getTotalSpent(mk);
-  const toAssign = calcToAssign(mk);
+  const toAssign = calc.toAssign;
 
   // Píldora de Ingresos
   const pInc = document.getElementById('pill-income');
@@ -846,7 +859,6 @@ function calcTotals() {
   // Píldora de Gastado
   const pSpn = document.getElementById('pill-spent');
   document.getElementById('p-spent').textContent = efs(totalSpent);
-  // Si es un ingreso (por un reembolso) en negativo, el fondo se pone rojo de alerta
   document.getElementById('p-spent').style.color = totalSpent < 0 ? '#ffffff' : (totalSpent > 0 ? 'var(--rose)' : 'var(--text-1)');
   pSpn.className = 'pill ' + (totalSpent < 0 ? 'alert-box' : '');
   
@@ -888,6 +900,8 @@ function renderBudget() {
   const mk = monthKey(currentMonth);
   const md = getMonthData(mk);
   const spent = getMonthSpent(mk);
+  const calc = getMonthCalculations(mk);
+  
   const body = document.getElementById('b-body');
   body.innerHTML = '';
 
@@ -908,7 +922,7 @@ function renderBudget() {
     
     grp.cats.forEach(c => { 
       gaThisMonth += (md.assignments[c.id] || 0); 
-      gvTotal += getCatAvail(c.id, mk);
+      gvTotal += (calc.catAvail[c.id] || 0);
     });
     
     const wrap = document.createElement('div');
@@ -931,9 +945,9 @@ function renderBudget() {
     grp.cats.forEach(cat => {
       const assigned = md.assignments[cat.id] || 0; // Asignado SOLO ESTE MES
       const catSpent = spent[cat.id] || 0;          // Gastado SOLO ESTE MES
-      const av = getCatAvail(cat.id, mk);           // Disponible ACUMULADO
+      const av = calc.catAvail[cat.id] || 0;        // Disponible ACUMULADO REAL
       
-      const totalFunds = av + catSpent; // El total que había antes de gastar este mes
+      const totalFunds = av + catSpent; 
       const pct = totalFunds > 0 ? Math.min(catSpent / totalFunds * 100, 100) : (catSpent > 0 ? 100 : 0);
       const ov = av < 0;
       
