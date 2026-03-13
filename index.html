@@ -724,27 +724,14 @@ function confirmReset() {
   }
 }
 
-// --- MOTOR MATEMÁTICO YNAB (Mes a Mes Secuencial) ---
+// --- MOTOR MATEMÁTICO YNAB ---
 function getMonthData(mk) {
   if (!S.monthData) S.monthData = {};
   if (!S.monthData[mk]) S.monthData[mk] = { assignments: {} };
   return S.monthData[mk];
 }
-function getMonthSpent(mk) {
-  const spent = {};
-  S.txs.forEach(t => {
-    if (t.month === mk && t.type === 'expense') {
-      const key = t.cat || '_none';
-      spent[key] = (spent[key] || 0) + t.amt;
-    }
-  });
-  return spent;
-}
-function getTotalSpent(mk) {
-  return S.txs.filter(t => t.month === mk && t.type === 'expense').reduce((s, t) => s + t.amt, 0);
-}
 
-// Función maestra: Calcula el estado contable navegando cronológicamente mes a mes.
+// Calcula el estado contable navegando cronológicamente mes a mes.
 function getMonthCalculations(targetMk) {
   let monthsSet = new Set();
   if (S.monthData) Object.keys(S.monthData).forEach(m => monthsSet.add(m));
@@ -781,7 +768,7 @@ function getMonthCalculations(targetMk) {
           if (t.type === 'income') inc += t.amt;
           if (t.type === 'expense') {
             if (t.cat) exp[t.cat] = (exp[t.cat] || 0) + t.amt;
-            else uncategorizedExp += t.amt; // Gasto sin categoría se come el ToAssign
+            else uncategorizedExp += t.amt; // Gasto sin categoría se come el ToAssign directamente
           }
         }
       });
@@ -805,6 +792,20 @@ function getMonthCalculations(targetMk) {
     }
   }
   return { toAssign: 0, catAvail: {} };
+}
+
+function getMonthSpent(mk) {
+  const spent = {};
+  S.txs.forEach(t => {
+    if (t.month === mk && t.type === 'expense') {
+      const key = t.cat || '_none';
+      spent[key] = (spent[key] || 0) + t.amt;
+    }
+  });
+  return spent;
+}
+function getTotalSpent(mk) {
+  return S.txs.filter(t => t.month === mk && t.type === 'expense').reduce((s, t) => s + t.amt, 0);
 }
 
 function ensureRecurringForMonth(mk) {
@@ -1116,9 +1117,15 @@ function renderGoals() {
   body.innerHTML = S.goals.map(g => {
     const pct = Math.min(g.saved / g.target * 100, 100);
     const rem = g.target - g.saved;
-    const td = new Date(g.date+'-01'), now = new Date();
-    const ml = Math.max(1, (td.getFullYear()-now.getFullYear())*12 + td.getMonth()-now.getMonth());
+    
+    // Calcular meses restantes desde el mes de la vista actual (en lugar de la fecha real de hoy)
+    const td = new Date(g.date+'-01');
+    const viewYear = currentMonth.getFullYear();
+    const viewMonth = currentMonth.getMonth();
+    const ml = Math.max(1, (td.getFullYear() - viewYear) * 12 + td.getMonth() - viewMonth);
+    
     const mon = rem > 0 ? (rem/ml).toFixed(0) : 0;
+    
     return `<div class="goal-card" onclick="openEditGoal('${g.id}')">
       <div class="goal-top2"><div class="goal-emo">${g.emoji}</div><span class="gbadge ${g.type}">${lbl[g.type]}</span></div>
       <div class="goal-name">${g.name}</div>
