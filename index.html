@@ -83,6 +83,11 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
 .mnbtn:active { background:var(--surf-2); box-shadow:var(--neo-down); }
 #month-lbl { font-size:0.8rem; font-weight:600; color:var(--text-1); min-width:90px; text-align:center; text-transform:uppercase; letter-spacing:0.05em;}
 
+/* BOTÓN HOY */
+.today-btn { background:var(--surf-1); color:var(--blue); border-radius:var(--r-pill); padding:6px 12px; font-size:0.7rem; font-weight:700; box-shadow:var(--neo-up-sm); text-transform:uppercase; letter-spacing:0.05em; transition:all 0.2s var(--ease); cursor:pointer; }
+.today-btn:active { box-shadow:var(--neo-down); transform:scale(0.95); }
+.today-btn.hidden { display:none; }
+
 /* TARJETA ASIGNAR COMPACTA */
 .assign-card { background:var(--surf-1); border-radius:var(--r-lg); padding:16px; text-align:center; box-shadow:var(--neo-up); margin-bottom:12px; position:relative; overflow:hidden;}
 .assign-lbl { font-size:0.7rem; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px; }
@@ -350,14 +355,17 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
         <span class="logo-txt">MaBudget</span>
       </div>
 
-      <div class="month-nav">
-        <button class="mnbtn" onclick="chMonth(-1)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <span id="month-lbl"></span>
-        <button class="mnbtn" onclick="chMonth(1)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button id="btn-today" class="today-btn hidden" onclick="goToCurrentMonth()">Hoy</button>
+        <div class="month-nav">
+          <button class="mnbtn" onclick="chMonth(-1)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span id="month-lbl"></span>
+          <button class="mnbtn" onclick="chMonth(1)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
       </div>
     </div>
     
@@ -978,8 +986,28 @@ function chMonth(d) {
   ensureRecurringForMonth(mk);
   save(); updMonth(); fullRender(); 
 }
+
+function goToCurrentMonth() {
+  currentMonth = new Date();
+  const mk = monthKey(currentMonth);
+  ensureRecurringForMonth(mk);
+  save(); updMonth(); fullRender(); 
+}
+
 function updMonth() {
   document.getElementById('month-lbl').textContent = MESES[currentMonth.getMonth()] + ' ' + currentMonth.getFullYear();
+  
+  // Mostrar u ocultar el botón "Hoy"
+  const actualNow = new Date();
+  const isCurrentMonth = currentMonth.getFullYear() === actualNow.getFullYear() && currentMonth.getMonth() === actualNow.getMonth();
+  const todayBtn = document.getElementById('btn-today');
+  if (todayBtn) {
+    if (!isCurrentMonth) {
+      todayBtn.classList.remove('hidden');
+    } else {
+      todayBtn.classList.add('hidden');
+    }
+  }
 }
 
 // --- RENDER PLAN (BUDGET) ---
@@ -1560,5 +1588,3 @@ ensureRecurringForMonth(initMk); save(); updMonth(); fullRender();
 
 </body>
 </html>
-
-
