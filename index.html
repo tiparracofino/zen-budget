@@ -25,7 +25,7 @@
   --red-alert-shadow: rgba(255, 59, 48, 0.35);
 
   --text-1:#3D3930; --text-2:#7D776D; --text-3:#AAA49A; --text-inv:#FDFCFA;
-  --glass:rgba(239,236,230,0.85); --glass-border:rgba(255,255,255,0.5); --glass-heavy:rgba(239,236,230,0.95);
+  --glass:rgba(239,236,230,0.7); --glass-border:rgba(255,255,255,0.5); --glass-heavy:rgba(239,236,230,0.92);
   --r-xs:12px; --r-sm:16px; --r-md:24px; --r-lg:32px; --r-pill:100px;
   --f-display:'Fraunces',serif; --f-body:'Outfit',sans-serif;
   --ease:cubic-bezier(0.16,1,0.3,1); --spring:cubic-bezier(0.34,1.56,0.64,1);
@@ -46,7 +46,7 @@
   --red-alert-shadow: rgba(255, 69, 58, 0.3);
 
   --text-1:#E2DED6; --text-2:#8A857D; --text-3:#5C5850; --text-inv:#1A1D1E;
-  --glass:rgba(30,34,36,0.85); --glass-border:rgba(255,255,255,0.06); --glass-heavy:rgba(26,29,30,0.95);
+  --glass:rgba(30,34,36,0.85); --glass-border:rgba(255,255,255,0.06); --glass-heavy:rgba(26,29,30,0.94);
 }
 
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -151,7 +151,7 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
 
 .tx-swipe-wrap { position:relative; overflow:hidden; background:var(--red-alert); border-radius:var(--r-md); margin-bottom:10px; box-shadow:var(--neo-flat);}
 .tx-del-bg { position:absolute; right:0; top:0; bottom:0; width:80px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:0.8rem; font-weight:700; flex-direction:column; pointer-events:none; }
-.tx-item { display:flex; align-items:center; padding:14px; background:var(--surf-1); gap:12px; cursor:pointer; position:relative; transform:translateX(0); will-change:transform; touch-action:pan-y; }
+.tx-item { display:flex; align-items:center; padding:14px; background:var(--surf-1); gap:12px; cursor:pointer; position:relative; transform:translateX(0); will-change:transform; touch-action:pan-y; z-index: 2; }
 .tx-icon { width:40px; height:40px; border-radius:12px; background:var(--surf-2); box-shadow:var(--neo-up-sm); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; position:relative; }
 .tx-dot { position:absolute; top:-2px; right:-2px; width:12px; height:12px; background:var(--cream-accent); border-radius:50%; border:2px solid var(--surf-1); }
 .tx-recurring-dot { position:absolute; bottom:-2px; right:-2px; width:14px; height:14px; background:var(--blue); border-radius:50%; border:2px solid var(--surf-1); font-size:8px; display:flex; align-items:center; justify-content:center; color:#fff; }
@@ -238,8 +238,6 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
   border-top:1px solid var(--glass-border); 
   display:flex; 
   z-index:90; 
-  
-  /* Aquí está la magia: envuelve la barra hasta abajo del todo y usa padding para elevar el contenido */
   padding-bottom: env(safe-area-inset-bottom);
 }
 .ntab { 
@@ -251,8 +249,6 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
   gap:4px; 
   color:var(--text-3); 
   transition:all 0.2s var(--ease); 
-  
-  /* Márgenes internos fijos para los botones sin limitar la altura total del contenedor */
   padding: 12px 0 8px 0;
 }
 .ntab.on { color:var(--blue); }
@@ -263,7 +259,6 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
 #fab { 
   position:fixed; 
   right:20px; 
-  /* Sube el FAB basándose en la barra inferior dinámica */
   bottom: calc(80px + env(safe-area-inset-bottom)); 
   width:52px; 
   height:52px; 
@@ -332,6 +327,10 @@ input[type="date"], input[type="month"] { font-family:var(--f-body); text-transf
 /* --- TOAST --- */
 .toast{position:fixed;top:calc(16px + env(safe-area-inset-top));left:50%;transform:translateX(-50%) translateY(-20px);background:var(--glass-heavy);border:1px solid var(--glass-border);color:var(--text-1);padding:10px 24px;border-radius:var(--r-pill);font-size:0.8rem;font-weight:700;z-index:200;opacity:0;pointer-events:none;transition:all 0.35s var(--ease);box-shadow:var(--neo-up); white-space:nowrap;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* CAPA DE CONFIRMACIÓN ESPECIAL (Encima de todo) */
+#ov-confirm { z-index: 150; }
+#ov-confirm .sheet { z-index: 151; }
 
 svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 </style>
@@ -682,6 +681,23 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
   </div>
 </div>
 
+<!-- ================= SHEET CONFIRMACIÓN UNIVERSAL ================= -->
+<div class="overlay" id="ov-confirm">
+  <div class="sheet" style="max-height: 40vh;">
+    <div class="sheet-grip"></div>
+    <div class="sheet-hd" style="margin-bottom: 12px;">
+      <h3 id="confirm-title">¿Estás seguro?</h3>
+    </div>
+    <div class="sheet-body">
+      <div id="confirm-msg" style="font-size:0.95rem; font-weight:600; color:var(--text-2); margin-bottom:24px; line-height:1.5;"></div>
+      <div class="btn-row">
+        <button class="btn btn-soft" onclick="cancelConfirm()">Cancelar</button>
+        <button class="btn btn-warn" onclick="doConfirm()">Borrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- LÓGICA DE APLICACIÓN -->
@@ -703,6 +719,29 @@ let editingGrpId  = null;
 let editingCatId  = null;
 let txType = 'expense';
 let _toastTimer = null;
+
+// --- SISTEMA DE CONFIRMACIÓN UNIVERSAL ---
+let _confirmYes = null;
+let _confirmNo = null;
+
+function askConfirm(title, msg, onYes, onNo) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  _confirmYes = onYes;
+  _confirmNo = onNo;
+  document.getElementById('ov-confirm').classList.add('open');
+}
+function doConfirm() {
+  document.getElementById('ov-confirm').classList.remove('open');
+  if (_confirmYes) _confirmYes();
+  _confirmYes = null; _confirmNo = null;
+}
+function cancelConfirm() {
+  document.getElementById('ov-confirm').classList.remove('open');
+  if (_confirmNo) _confirmNo();
+  _confirmYes = null; _confirmNo = null;
+}
+
 
 // --- UTILIDADES ---
 function showToast(m){
@@ -762,9 +801,13 @@ function importJSON(e) {
   r.readAsText(f);
 }
 function confirmReset() {
-  if (confirm('¿Borrar todos los datos permanentemente?')) {
-    S = JSON.parse(JSON.stringify(DEFAULT_STATE)); save(); fullRender(); showToast('Datos borrados');
-  }
+  askConfirm(
+    'Borrar datos', 
+    '¿Eliminar TODOS los datos permanentemente? Esta acción es irreversible.',
+    () => {
+      S = JSON.parse(JSON.stringify(DEFAULT_STATE)); save(); fullRender(); showToast('Datos borrados');
+    }
+  );
 }
 
 // --- MOTOR MATEMÁTICO YNAB ---
@@ -1020,8 +1063,7 @@ function renderBudget() {
     });
 
     const addR = document.createElement('div');
-    addR.className = 'add-cat';
-    addR.textContent = '+ añadir subcategoría';
+    addR.className = 'add-cat'; addR.textContent = '+ añadir subcategoría';
     addR.onclick = () => { openSh('cat', grp.id); };
     crows.appendChild(addR);
     wrap.appendChild(crows);
@@ -1132,13 +1174,24 @@ function initSwipe(item, wrap, txId) {
     if (!swiping) return;
     swiping = false; item.style.transition = 'transform .25s var(--ease)';
     if (curX < -THRESHOLD) {
-      item.style.transform = `translateX(-100%)`;
-      setTimeout(() => {
-        quickDeleteTx(txId);
-        wrap.style.transition = 'all .25s var(--ease)'; wrap.style.maxHeight = '0'; wrap.style.opacity = '0'; wrap.style.margin = '0';
-        setTimeout(() => wrap.remove(), 250);
-      }, 150);
-    } else { item.style.transform = 'translateX(0)'; }
+      askConfirm(
+        'Borrar movimiento',
+        '¿Quieres eliminar esta transacción?',
+        () => {
+          item.style.transform = `translateX(-100%)`;
+          setTimeout(() => {
+            quickDeleteTx(txId);
+            wrap.style.transition = 'all .25s var(--ease)'; wrap.style.maxHeight = '0'; wrap.style.opacity = '0'; wrap.style.margin = '0';
+            setTimeout(() => wrap.remove(), 250);
+          }, 150);
+        },
+        () => {
+          item.style.transform = 'translateX(0)'; // Snap back on cancel
+        }
+      );
+    } else { 
+      item.style.transform = 'translateX(0)'; 
+    }
   });
 }
 
@@ -1299,12 +1352,22 @@ function openSh(name, argGroupId = null) {
   if (name === 'recurring') { renderRecSheet(); }
   document.getElementById('ov-'+name).classList.add('open');
 }
-function closeSh(name) { document.getElementById('ov-'+name).classList.remove('open'); }
+
+function closeSh(name) { 
+  document.getElementById('ov-'+name).classList.remove('open'); 
+}
 
 // Background click closes sheets
-['tx','cat','goal','income','group','editcat','recurring'].forEach(n => {
+['tx','cat','goal','income','group','editcat','recurring','confirm'].forEach(n => {
   const ov = document.getElementById('ov-'+n);
-  if (ov) ov.addEventListener('click', e => { if (e.target === ov) { if (n==='tx') editingTxId=null; if (n==='goal') editingGoalId=null; closeSh(n); }});
+  if (ov) ov.addEventListener('click', e => { 
+    if (e.target === ov) { 
+      if (n==='tx') editingTxId=null; 
+      if (n==='goal') editingGoalId=null; 
+      if (n==='confirm') { cancelConfirm(); return; }
+      closeSh(n); 
+    }
+  });
 });
 
 function setType(t) {
@@ -1327,6 +1390,7 @@ function populateCatSelect() {
     sel.appendChild(og);
   });
 }
+
 function openEditTx(id) {
   const tx = S.txs.find(t => t.id === id); if (!tx) return;
   editingTxId = id;
@@ -1343,6 +1407,7 @@ function openEditTx(id) {
   populateCatSelect(); document.getElementById('f-cat').value = tx.cat || ''; setType(tx.type);
   document.getElementById('ov-tx').classList.add('open');
 }
+
 function saveTx() {
   const amt = parseFloat(document.getElementById('f-amt').value) || 0;
   const pay = document.getElementById('f-pay').value.trim();
@@ -1368,12 +1433,26 @@ function saveTx() {
   }
   save(); closeSh('tx'); fullRender(); showToast('Guardado');
 }
+
 function deleteTx() {
   if (!editingTxId) return;
-  const tx = S.txs.find(t => t.id === editingTxId);
-  if (tx && tx.recurringId) { if (!S.recurringDeleted) S.recurringDeleted = {}; S.recurringDeleted[tx.recurringId + '_' + tx.month] = true; }
-  S.txs = S.txs.filter(t => t.id !== editingTxId); editingTxId = null;
-  save(); closeSh('tx'); fullRender(); showToast('Eliminada');
+  askConfirm(
+    'Borrar transacción',
+    '¿Seguro que quieres eliminar este movimiento?',
+    () => {
+      const tx = S.txs.find(t => t.id === editingTxId);
+      if (tx && tx.recurringId) { 
+        if (!S.recurringDeleted) S.recurringDeleted = {}; 
+        S.recurringDeleted[tx.recurringId + '_' + tx.month] = true; 
+      }
+      S.txs = S.txs.filter(t => t.id !== editingTxId); 
+      editingTxId = null;
+      save(); 
+      closeSh('tx'); 
+      fullRender(); 
+      showToast('Eliminada');
+    }
+  );
 }
 
 function saveCat() {
@@ -1385,32 +1464,18 @@ function saveCat() {
   save(); closeSh('cat'); fullRender(); showToast('Categoría creada');
 }
 
-function renderRecSheet() {
-  const body = document.getElementById('rec-sheet-body');
-  if (!S.recurringTxs || !S.recurringTxs.length) { body.innerHTML = '<div style="color:var(--text-3);font-size:0.9rem;padding:20px 0;text-align:center">Sin transacciones recurrentes.</div>'; return; }
-  const freqLbl = { monthly:'Mensual', weekly:'Semanal', bimonthly:'Bimestral', quarterly:'Trimestral', yearly:'Anual' };
-  body.innerHTML = '';
-  S.recurringTxs.forEach(r => {
-    const cat = r.cat ? gc(r.cat) : null;
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid rgba(0,0,0,0.05)';
-    div.innerHTML = `
-      <div style="width:40px;height:40px;border-radius:12px;background:var(--surf-1);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${r.emoji}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:1rem;font-weight:600;color:var(--text-1)">${r.pay}</div>
-        <div style="font-size:0.75rem;font-weight:500;color:var(--text-2);margin-top:2px">${freqLbl[r.freq] || r.freq} · ${cat ? cat.name : 'Sin categoría'}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-family:var(--f-display);font-size:1.1rem;font-weight:600;color:${r.type==='income'?'var(--blue)':'var(--rose)'}">${r.type==='income'?'+':'−'}${ef(Math.abs(r.amt))}</div>
-        <button onclick="deleteRecurring('${r.id}')" style="font-size:0.75rem;font-weight:700;color:var(--rose);margin-top:4px">ELIMINAR</button>
-      </div>`;
-    body.appendChild(div);
-  });
-}
 function deleteRecurring(id) {
-  if (!confirm('¿Eliminar esta recurrente?')) return;
-  S.recurringTxs = S.recurringTxs.filter(r => r.id !== id);
-  save(); renderRecSheet(); fullRender(); showToast('Eliminada');
+  askConfirm(
+    'Eliminar recurrencia',
+    '¿Dejar de generar este movimiento automáticamente? (Los ya generados no se borrarán)',
+    () => {
+      S.recurringTxs = S.recurringTxs.filter(r => r.id !== id);
+      save(); 
+      renderRecSheet(); 
+      fullRender(); 
+      showToast('Eliminada');
+    }
+  );
 }
 
 function openEditGoal(id) {
@@ -1429,18 +1494,61 @@ function saveGoal() {
   if (editingGoalId) { const g = S.goals.find(g=>g.id===editingGoalId); if(g) Object.assign(g,data); editingGoalId=null; } else S.goals.push({ id:uid(), ...data });
   save(); closeSh('goal'); fullRender(); showToast('Guardada');
 }
+
 function deleteGoal() {
-  if (!editingGoalId) return; S.goals = S.goals.filter(g=>g.id!==editingGoalId); editingGoalId=null;
-  save(); closeSh('goal'); fullRender(); showToast('Eliminada');
+  if (!editingGoalId) return; 
+  askConfirm(
+    'Borrar meta',
+    '¿Estás seguro de que quieres eliminar esta meta de ahorro?',
+    () => {
+      S.goals = S.goals.filter(g=>g.id!==editingGoalId); 
+      editingGoalId=null;
+      save(); 
+      closeSh('goal'); 
+      fullRender(); 
+      showToast('Eliminada');
+    }
+  );
 }
 
 function openEditGroup(id, e) { e.stopPropagation(); const g = gg(id); if (!g) return; editingGrpId = id; document.getElementById('grp-nm').value = g.name; document.getElementById('ov-group').classList.add('open'); }
 function saveGroup() { const g = gg(editingGrpId); if (!g) return; const nm = document.getElementById('grp-nm').value.trim(); if (!nm) return; g.name = nm; editingGrpId = null; save(); closeSh('group'); fullRender(); }
-function deleteGroup() { const g = gg(editingGrpId); if (!g || !confirm('¿Borrar grupo y subcategorías?')) return; S.groups = S.groups.filter(gr => gr.id !== editingGrpId); editingGrpId = null; save(); closeSh('group'); fullRender(); }
+
+function deleteGroup() { 
+  const g = gg(editingGrpId); 
+  if (!g) return; 
+  askConfirm(
+    'Borrar grupo',
+    `¿Eliminar el grupo "${g.name}" y TODAS sus categorías internas?`,
+    () => {
+      S.groups = S.groups.filter(gr => gr.id !== editingGrpId); 
+      editingGrpId = null; 
+      save(); 
+      closeSh('group'); 
+      fullRender(); 
+      showToast('Grupo eliminado');
+    }
+  );
+}
 
 function openEditCatSheet(id, e) { e.stopPropagation(); const cat = gc(id); if (!cat) return; editingCatId = id; document.getElementById('ec-emo').value = cat.emoji; document.getElementById('ec-nm').value = cat.name; document.getElementById('ov-editcat').classList.add('open'); }
 function saveEditCat() { const cat = gc(editingCatId); if (!cat) return; const nm = document.getElementById('ec-nm').value.trim(); if (!nm) return; cat.name = nm; cat.emoji = document.getElementById('ec-emo').value || cat.emoji; editingCatId = null; save(); closeSh('editcat'); fullRender(); }
-function deleteEditCat() { if (!confirm('¿Eliminar categoría?')) return; S.groups.forEach(g => { g.cats = g.cats.filter(c => c.id !== editingCatId); }); S.txs.forEach(t => { if(t.cat === editingCatId) t.cat = null; }); editingCatId = null; save(); closeSh('editcat'); fullRender(); }
+
+function deleteEditCat() { 
+  askConfirm(
+    'Borrar categoría',
+    '¿Eliminar esta categoría? (Los movimientos asociados quedarán "Sin Categoría").',
+    () => {
+      S.groups.forEach(g => { g.cats = g.cats.filter(c => c.id !== editingCatId); }); 
+      S.txs.forEach(t => { if(t.cat === editingCatId) t.cat = null; }); 
+      editingCatId = null; 
+      save(); 
+      closeSh('editcat'); 
+      fullRender(); 
+      showToast('Categoría eliminada');
+    }
+  );
+}
 
 // --- INIT ---
 S.txs.forEach(t => { if (!t.month) t.month = t.date ? t.date.slice(0,7) : monthKey(new Date()); });
