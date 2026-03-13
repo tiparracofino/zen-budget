@@ -589,7 +589,7 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
     <div class="sheet-body">
       <div style="font-size:0.95rem;color:var(--text-2);line-height:1.7;margin-bottom:20px; font-weight:500;">
         Pulsa el botón flotante y selecciona <strong>Ingreso</strong> para registrar tu nómina o dinero recibido.<br><br>
-        El importe <em>Para asignar</em> refleja el dinero real que has recibido menos lo que ya has asignado a tus categorías. Exactamente como funciona YNAB.
+        El importe <em>Para asignar</em> es una piscina global. Refleja el dinero físico real que tienes en tu cuenta, menos lo que ya has asignado en sobres (categorías) este mes o meses futuros. Exactamente como funciona YNAB.
       </div>
     </div>
     <div class="btn-row"><button class="btn btn-fill" onclick="closeSh('income'); openSh('tx');">Añadir ingreso ahora</button></div>
@@ -730,6 +730,28 @@ function getMonthData(mk) {
   if (!S.monthData[mk]) S.monthData[mk] = { assignments: {} };
   return S.monthData[mk];
 }
+
+// 1. Calcula el Disponible real de una categoría arrastrando saldos mes a mes
+function getCatAvail(catId, upToMk) {
+  let assigned = 0;
+  let spent = 0;
+  if (S.monthData) {
+    Object.keys(S.monthData).forEach(m => {
+      if (m <= upToMk) {
+        assigned += (S.monthData[m].assignments[catId] || 0);
+      }
+    });
+  }
+  if (S.txs) {
+    S.txs.forEach(t => {
+      if (t.cat === catId && t.type === 'expense' && t.month <= upToMk) {
+        spent += t.amt;
+      }
+    });
+  }
+  return assigned - spent;
+}
+
 function getMonthSpent(mk) {
   const spent = {};
   S.txs.filter(t => t.month === mk && t.type === 'expense').forEach(t => {
@@ -741,17 +763,39 @@ function getMonthSpent(mk) {
 function getTotalSpent(mk) {
   return S.txs.filter(t => t.month === mk && t.type === 'expense').reduce((s, t) => s + t.amt, 0);
 }
+
+// 2. Calcula el "Para Asignar" restando tu efectivo real menos lo que está reservado
 function calcToAssign(mk) {
+  // A. Todo tu efectivo físico recibido en la historia hasta este mes
   const totalIncome = S.txs.filter(t => t.type === 'income' && t.month <= mk).reduce((s, t) => s + t.amt, 0);
-  let totalAssigned = 0;
+  const totalExpense = S.txs.filter(t => t.type === 'expense' && t.month <= mk).reduce((s, t) => s + t.amt, 0);
+  const totalCash = totalIncome - totalExpense;
+
+  // B. Dinero bloqueado o reservado en tus "sobres" (categorías en positivo)
+  let positiveReserved = 0;
+  S.groups.forEach(g => {
+    g.cats.forEach(c => {
+      const avail = getCatAvail(c.id, mk);
+      if (avail > 0) positiveReserved += avail;
+    });
+  });
+
+  // C. Dinero que ya has pre-asignado a meses futuros
+  let futureAssignments = 0;
   if (S.monthData) {
     Object.keys(S.monthData).forEach(m => {
-      if (m > mk) return;
-      Object.values(S.monthData[m].assignments || {}).forEach(v => { totalAssigned += v; });
+      if (m > mk) {
+        Object.values(S.monthData[m].assignments || {}).forEach(v => {
+          futureAssignments += v;
+        });
+      }
     });
   }
-  return totalIncome - totalAssigned;
+
+  // D. Dinero Libre = Efectivo - Sobres Positivos - Asignaciones Futuras
+  return totalCash - positiveReserved - futureAssignments;
 }
+
 function ensureRecurringForMonth(mk) {
   if (!S.recurringTxs || !S.recurringTxs.length) return;
   if (!S.recurringDeleted) S.recurringDeleted = {};
@@ -860,9 +904,12 @@ function renderBudget() {
   }
 
   S.groups.forEach(grp => {
-    let ga = 0, gSpent = 0;
-    grp.cats.forEach(c => { ga += (md.assignments[c.id] || 0); gSpent += (spent[c.id] || 0); });
-    const gv = ga - gSpent;
+    let gaThisMonth = 0, gvTotal = 0;
+    
+    grp.cats.forEach(c => { 
+      gaThisMonth += (md.assignments[c.id] || 0); 
+      gvTotal += getCatAvail(c.id, mk);
+    });
     
     const wrap = document.createElement('div');
     wrap.className = 'g-card';
@@ -872,8 +919,8 @@ function renderBudget() {
     gr.innerHTML = `
       <div class="g-title"><span class="chevron">▾</span>${grp.name}</div>
       <div style="display:flex; gap:16px; align-items:center;">
-        <div class="g-num" style="color:${ga<0?'var(--red-alert)':'var(--text-1)'}">${efs(ga)}</div>
-        <div class="g-num" style="color:${gv<0?'var(--red-alert)':'var(--text-1)'}; width:70px; text-align:right;">${efs(gv)}</div>
+        <div class="g-num" style="color:${gaThisMonth<0?'var(--red-alert)':'var(--text-1)'}">${efs(gaThisMonth)}</div>
+        <div class="g-num" style="color:${gvTotal<0?'var(--red-alert)':'var(--text-1)'}; width:70px; text-align:right;">${efs(gvTotal)}</div>
       </div>`;
     gr.onclick = () => { grp.open = !grp.open; save(); renderBudget(); };
     wrap.appendChild(gr);
@@ -882,10 +929,12 @@ function renderBudget() {
     crows.className = 'c-rows' + (grp.open ? '' : ' hidden');
 
     grp.cats.forEach(cat => {
-      const assigned = md.assignments[cat.id] || 0;
-      const catSpent = spent[cat.id] || 0;
-      const av = assigned - catSpent;
-      const pct = assigned > 0 ? Math.min(catSpent / assigned * 100, 100) : 0;
+      const assigned = md.assignments[cat.id] || 0; // Asignado SOLO ESTE MES
+      const catSpent = spent[cat.id] || 0;          // Gastado SOLO ESTE MES
+      const av = getCatAvail(cat.id, mk);           // Disponible ACUMULADO
+      
+      const totalFunds = av + catSpent; // El total que había antes de gastar este mes
+      const pct = totalFunds > 0 ? Math.min(catSpent / totalFunds * 100, 100) : (catSpent > 0 ? 100 : 0);
       const ov = av < 0;
       
       const row = document.createElement('div');
@@ -945,7 +994,6 @@ function startEdit(id, e) {
 function endEdit(id) {
   const el = document.getElementById('ca-'+id), inp = document.getElementById('ca-i-'+id);
   if (!el || !inp) return;
-  // Eliminamos Math.abs para que si se quiere, se puedan meter números negativos
   getMonthData(monthKey(currentMonth)).assignments[id] = parseFloat(inp.value) || 0;
   el.classList.remove('editing'); inp.style.display = 'none'; document.getElementById('ca-t-'+id).style.display = '';
   save(); fullRender(); showToast('Asignación guardada');
