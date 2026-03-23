@@ -1485,9 +1485,9 @@ function renderRep() {
   const tExp = S.txs.filter(t => t.month === mk && t.type === 'expense').reduce((s,t) => s+t.amt, 0);
   const spent = getMonthSpent(mk);
   let cats = [];
-  S.groups.forEach(g => g.cats.forEach(c => { if((spent[c.id]||0) > 0) cats.push({ ...c, spent: spent[c.id] }); }));
+  S.groups.forEach(function(g) { g.cats.forEach(function(c) { if((spent[c.id]||0) > 0) { var item = Object.assign({}, c); item.spent = spent[c.id]; cats.push(item); } }); });
   cats.sort((a,b) => b.spent - a.spent);
-  const maxS = cats[0]?.spent || 1;
+  const maxS = (cats.length > 0 && cats[0].spent) ? cats[0].spent : 1;
   const age = tExp > 0 && tInc > 0 ? Math.min(Math.round(tInc / tExp * 30), 90) : 0;
 
   body.innerHTML = `
@@ -1686,10 +1686,11 @@ function saveTx() {
     if (tx) { tx.date=dateVal; tx.month=txMonth; tx.pay=pay; tx.cat=cat; tx.amt=amt; tx.type=txType; tx.ok=ok; tx.note=document.getElementById('f-note').value; }
     editingTxId = null;
   } else {
-    const tx = { id:uid(), month:txMonth, date:dateVal, pay, cat, amt, type:txType, ok, note:document.getElementById('f-note').value };
+    const tx = { id:uid(), month:txMonth, date:dateVal, pay:pay, cat:cat, amt:amt, type:txType, ok:ok, note:document.getElementById('f-note').value };
     S.txs.unshift(tx);
     if (isRec) {
-      const r = { id:uid(), pay, cat, amt, type:txType, freq:document.getElementById('f-rec-freq').value, recEnd:document.getElementById('f-rec-end').value||null, startMonth:txMonth, emoji: cat ? (gc(cat)?.emoji || '🔄') : '🔄' };
+      var _catObj = cat ? gc(cat) : null;
+      const r = { id:uid(), pay:pay, cat:cat, amt:amt, type:txType, freq:document.getElementById('f-rec-freq').value, recEnd:document.getElementById('f-rec-end').value||null, startMonth:txMonth, emoji: (_catObj && _catObj.emoji) || '🔄' };
       if (!S.recurringTxs) S.recurringTxs = []; S.recurringTxs.push(r);
       tx.recurringId = r.id;
     }
@@ -1718,7 +1719,7 @@ function deleteTx() {
 function saveCat() {
   const gSel = document.getElementById('c-grp').value, name = document.getElementById('c-nm').value.trim(), emoji = document.getElementById('c-emo').value || '📌';
   if (!name) { showToast('Escribe un nombre'); return; }
-  const nc = { id:uid(), emoji, name };
+  const nc = { id:uid(), emoji:emoji, name:name };
   if (gSel) { const g = gg(gSel); if (g) g.cats.push(nc); }
   else { const gn = document.getElementById('c-newg').value.trim() || 'Nuevo grupo'; S.groups.push({ id:uid(), name:gn, open:true, cats:[nc] }); }
   save(); closeSh('cat'); fullRender(); showToast('Categoría creada');
@@ -1745,8 +1746,8 @@ function saveGoal() {
   const name = document.getElementById('g-nm').value.trim(), target = parseFloat(document.getElementById('g-tgt').value) || 0, saved = parseFloat(document.getElementById('g-sv').value) || 0;
   if (!name || target <= 0) { showToast('Nombre y objetivo requeridos'); return; }
   const fallbackYear = new Date().getFullYear() + 1;
-  const data = { emoji:document.getElementById('g-emo').value||'🎯', name, type:document.getElementById('g-type').value, target, saved, date:document.getElementById('g-dt').value||`${fallbackYear}-12` };
-  if (editingGoalId) { const g = S.goals.find(g=>g.id===editingGoalId); if(g) Object.assign(g,data); editingGoalId=null; } else S.goals.push({ id:uid(), ...data });
+  const data = { emoji:document.getElementById('g-emo').value||'🎯', name:name, type:document.getElementById('g-type').value, target:target, saved:saved, date:document.getElementById('g-dt').value||(fallbackYear+'-12') };
+  if (editingGoalId) { const g = S.goals.find(function(g){return g.id===editingGoalId}); if(g) Object.assign(g,data); editingGoalId=null; } else { var goal = Object.assign({ id:uid() }, data); S.goals.push(goal); }
   save(); closeSh('goal'); fullRender(); showToast('Guardada');
 }
 
