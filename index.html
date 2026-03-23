@@ -518,29 +518,28 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
     </div>
     <div class="sheet-body">
       <div class="tabs">
-        <button class="tab on" id="tab-as-assign" onclick="setAssignMode('assign')">Asignar</button>
+        <button class="tab on" id="tab-as-assign" onclick="setAssignMode('assign')">Asignar / Ajustar</button>
         <button class="tab" id="tab-as-move" onclick="setAssignMode('move')">Mover dinero</button>
       </div>
 
       <!-- MODO ASIGNAR -->
       <div id="mode-assign">
-        <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.8rem; color:var(--text-2);">
-          <span>Actualmente disponible: <strong id="as-sh-avail" style="color:var(--text-1);">0.00€</strong></span>
-        </div>
-        <div class="fld">
-          <label class="fld-l">Cantidad asignada en este mes</label>
-          <input type="number" class="fld-in" id="as-val" step="0.01" style="font-size:1.4rem; font-family:var(--f-display); color:var(--blue); padding:16px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.85rem; color:var(--text-2);">
+          <div>Disponible en categoría: <strong id="as-sh-avail" style="color:var(--text-1);">0.00€</strong></div>
+          <div>Asignado este mes: <strong id="as-sh-assigned" style="color:var(--text-1);">0.00€</strong></div>
         </div>
         
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
-           <button class="btn btn-soft" style="padding:10px; font-weight:700;" onclick="modAssign(10)">+10</button>
-           <button class="btn btn-soft" style="padding:10px; font-weight:700;" onclick="modAssign(50)">+50</button>
-           <button class="btn btn-soft" style="padding:10px; font-weight:700;" onclick="modAssign(100)">+100</button>
-           <button class="btn btn-warn" style="padding:10px; font-weight:700;" onclick="modAssign('clear')">A 0</button>
+        <div class="fld">
+          <label class="fld-l" style="text-align:center;">Cantidad a sumar, restar o establecer</label>
+          <input type="number" class="fld-in" id="as-val" step="0.01" placeholder="0.00" style="font-size:1.6rem; font-family:var(--f-display); color:var(--blue); padding:16px; text-align:center;">
         </div>
-        <button class="btn btn-soft" style="width:100%; padding:14px; font-weight:700; color:var(--blue); margin-bottom:16px;" onclick="modAssign('toassign')">
-           + Asignar todo el dinero libre
-        </button>
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+           <button class="btn btn-soft" style="font-weight:700; color:var(--rose);" onclick="saveAssign('sub')">− Quitar</button>
+           <button class="btn btn-soft" style="font-weight:700; color:var(--blue);" onclick="saveAssign('add')">+ Añadir</button>
+        </div>
+        
+        <button class="btn btn-fill" style="width:100%; margin-bottom: 8px;" onclick="saveAssign('set')">= Establecer como total</button>
       </div>
 
       <!-- MODO MOVER -->
@@ -553,11 +552,8 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
           <label class="fld-l">Mover a:</label>
           <select class="fld-sel" id="mv-target" style="padding:16px; font-size:1rem;"></select>
         </div>
+        <button class="btn btn-fill" style="width:100%; margin-top:8px;" onclick="saveAssign('move')">Mover dinero</button>
       </div>
-    </div>
-    
-    <div class="btn-row">
-      <button class="btn btn-fill" onclick="saveAssign()">Confirmar</button>
     </div>
   </div>
 </div>
@@ -1195,9 +1191,9 @@ function openAssignSheet(catId) {
   
   document.getElementById('as-sh-title').textContent = cat.emoji + ' ' + cat.name;
   document.getElementById('as-sh-avail').textContent = efs(avail);
-  document.getElementById('as-val').value = assigned;
+  document.getElementById('as-sh-assigned').textContent = efs(assigned);
   
-  // Llenar el select de categorías destino
+  // Llenar el select de categorías destino para "Mover Dinero"
   const sel = document.getElementById('mv-target');
   sel.innerHTML = '<option value="">— Selecciona destino —</option>';
   S.groups.forEach(g => {
@@ -1212,6 +1208,8 @@ function openAssignSheet(catId) {
     if (added > 0) sel.appendChild(og);
   });
   
+  // Limpiamos los inputs
+  document.getElementById('as-val').value = '';
   document.getElementById('mv-val').value = '';
   
   setAssignMode('assign');
@@ -1226,48 +1224,35 @@ function setAssignMode(mode) {
   document.getElementById('mode-move').style.display = mode === 'move' ? 'block' : 'none';
 }
 
-function modAssign(val) {
-  const inp = document.getElementById('as-val');
-  let current = parseFloat(inp.value) || 0;
-  
-  if (val === 'clear') {
-    inp.value = 0;
-  } else if (val === 'toassign') {
-    const calc = getMonthCalculations(monthKey(currentMonth));
-    if (calc.toAssign > 0) {
-      inp.value = current + calc.toAssign;
-    } else {
-      showToast('No hay dinero libre para asignar');
-    }
-  } else {
-    inp.value = current + val;
-  }
-}
-
-function saveAssign() {
+function saveAssign(action = 'set') {
   const mk = monthKey(currentMonth);
   const md = getMonthData(mk);
   
   if (currentAssignMode === 'assign') {
-    const newVal = parseFloat(document.getElementById('as-val').value) || 0;
-    md.assignments[editingAssignCatId] = newVal;
-    showToast('Asignación guardada');
-  } else {
+    const inputVal = parseFloat(document.getElementById('as-val').value) || 0;
+    const currentAssigned = md.assignments[editingAssignCatId] || 0;
+    
+    if (action === 'add') {
+      if (inputVal === 0) { showToast('Introduce una cantidad primero'); return; }
+      md.assignments[editingAssignCatId] = currentAssigned + inputVal;
+      showToast('Añadido con éxito');
+    } else if (action === 'sub') {
+      if (inputVal === 0) { showToast('Introduce una cantidad primero'); return; }
+      md.assignments[editingAssignCatId] = currentAssigned - inputVal;
+      showToast('Restado con éxito');
+    } else if (action === 'set') {
+      md.assignments[editingAssignCatId] = inputVal;
+      showToast('Total actualizado');
+    }
+  } else if (action === 'move') {
     const moveAmt = parseFloat(document.getElementById('mv-val').value) || 0;
     const targetId = document.getElementById('mv-target').value;
     
-    if (moveAmt <= 0) {
-      showToast('Introduce una cantidad válida');
-      return;
-    }
-    if (!targetId) {
-      showToast('Selecciona una categoría destino');
-      return;
-    }
+    if (moveAmt <= 0) { showToast('Introduce una cantidad válida'); return; }
+    if (!targetId) { showToast('Selecciona una categoría destino'); return; }
     
-    // Restar a la categoría actual
+    // Restar a la categoría actual y sumar a la destino
     md.assignments[editingAssignCatId] = (md.assignments[editingAssignCatId] || 0) - moveAmt;
-    // Sumar a la categoría destino
     md.assignments[targetId] = (md.assignments[targetId] || 0) + moveAmt;
     showToast('Dinero movido con éxito');
   }
