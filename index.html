@@ -129,11 +129,26 @@ input,textarea,select{font-family:inherit;color:inherit;background:var(--surf-1)
 .c-prog-fill { height:100%; background:var(--blue); border-radius:3px; transition: width 0.3s; }
 .c-prog-fill.ov { background: var(--red-alert) !important; }
 
-.c-right { text-align:right; flex-shrink:0; margin-left:12px;}
-.c-assigned { font-family:var(--f-display); font-size:1.05rem; color:var(--text-1); cursor:text; padding:4px 8px; border-radius:var(--r-sm); position:relative; min-width:60px; text-align:right;}
-.c-assigned.editing { background:var(--surf-2); box-shadow:var(--neo-down); }
-.c-inp { position:absolute; inset:0; background:transparent; border:none; outline:none; font-family:var(--f-display); font-size:1.05rem; text-align:right; color:var(--blue); padding:0 8px; display:none; width:100%; border-radius:var(--r-sm);}
-
+/* Botón/Área para asignar dinero en la lista */
+.c-right { 
+  text-align:right; 
+  flex-shrink:0; 
+  margin-left:12px; 
+  padding: 6px 12px; 
+  border-radius: var(--r-sm); 
+  cursor: pointer; 
+  transition: background 0.2s;
+  background: var(--surf-1);
+  box-shadow: var(--neo-up-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.c-right:active {
+  box-shadow: var(--neo-down);
+  transform: scale(0.98);
+}
+.c-assigned { font-family:var(--f-display); font-size:1.05rem; color:var(--text-1); min-width:60px; text-align:right;}
 .c-avail { font-size:0.75rem; font-weight:600; margin-top:2px; transition: all 0.2s;}
 .c-avail.pos { color:var(--blue); } 
 .c-avail.zer { color:var(--text-3); }
@@ -491,6 +506,62 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 
 <!-- ================= MODALS / SHEETS ================= -->
 
+<!-- SHEET: ASIGNAR / MOVER DINERO -->
+<div class="overlay" id="ov-assign">
+  <div class="sheet">
+    <div class="sheet-grip"></div>
+    <div class="sheet-hd">
+      <h3 id="as-sh-title">Asignar dinero</h3>
+      <button class="sheet-x" onclick="closeSh('assign')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <div class="tabs">
+        <button class="tab on" id="tab-as-assign" onclick="setAssignMode('assign')">Asignar</button>
+        <button class="tab" id="tab-as-move" onclick="setAssignMode('move')">Mover dinero</button>
+      </div>
+
+      <!-- MODO ASIGNAR -->
+      <div id="mode-assign">
+        <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:0.8rem; color:var(--text-2);">
+          <span>Actualmente disponible: <strong id="as-sh-avail" style="color:var(--text-1);">0.00€</strong></span>
+        </div>
+        <div class="fld">
+          <label class="fld-l">Cantidad asignada en este mes</label>
+          <input type="number" class="fld-in" id="as-val" step="0.01" style="font-size:1.4rem; font-family:var(--f-display); color:var(--blue); padding:16px;">
+        </div>
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:16px;">
+           <button class="btn btn-soft" style="padding:10px; font-weight:700;" onclick="modAssign(10)">+10</button>
+           <button class="btn btn-soft" style="padding:10px; font-weight:700;" onclick="modAssign(50)">+50</button>
+           <button class="btn btn-soft" style="padding:10px; font-weight:700;" onclick="modAssign(100)">+100</button>
+           <button class="btn btn-warn" style="padding:10px; font-weight:700;" onclick="modAssign('clear')">A 0</button>
+        </div>
+        <button class="btn btn-soft" style="width:100%; padding:14px; font-weight:700; color:var(--blue); margin-bottom:16px;" onclick="modAssign('toassign')">
+           + Asignar todo el dinero libre
+        </button>
+      </div>
+
+      <!-- MODO MOVER -->
+      <div id="mode-move" style="display:none;">
+        <div class="fld">
+          <label class="fld-l">Cantidad a mover desde esta categoría</label>
+          <input type="number" class="fld-in" id="mv-val" step="0.01" placeholder="0.00" style="font-size:1.4rem; font-family:var(--f-display); color:var(--rose); padding:16px;">
+        </div>
+        <div class="fld">
+          <label class="fld-l">Mover a:</label>
+          <select class="fld-sel" id="mv-target" style="padding:16px; font-size:1rem;"></select>
+        </div>
+      </div>
+    </div>
+    
+    <div class="btn-row">
+      <button class="btn btn-fill" onclick="saveAssign()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <!-- SHEET: TRANSACCIÓN -->
 <div class="overlay" id="ov-tx">
   <div class="sheet">
@@ -728,6 +799,9 @@ let editingCatId  = null;
 let txType = 'expense';
 let _toastTimer = null;
 
+let editingAssignCatId = null;
+let currentAssignMode = 'assign';
+
 // --- SISTEMA DE CONFIRMACIÓN UNIVERSAL ---
 let _confirmYes = null;
 let _confirmNo = null;
@@ -840,8 +914,7 @@ function getMonthCalculations(targetMk) {
   for (let mk of months) {
     let md = S.monthData[mk] || { assignments: {} };
     
-    // 1. A principio de mes, los sobres en negativo (sobregasto) se resetean a 0
-    // y ese "agujero" se resta de tu dinero global "Para Asignar".
+    // 1. A principio de mes, los sobres en negativo se resetean a 0
     let prevOverspent = 0;
     Object.keys(catAvail).forEach(cId => {
       if (catAvail[cId] < 0) {
@@ -1076,17 +1149,12 @@ function renderBudget() {
             <div class="c-prog"><div class="c-prog-fill${ov?' ov':''}" style="width:${pct}%"></div></div>
           </div>
         </div>
-        <div class="c-right" style="display:flex; flex-direction:column; align-items:flex-end;">
-          <div class="c-assigned" id="ca-${cat.id}">
-            <span id="ca-t-${cat.id}" style="color:${assigned<0?'var(--red-alert)':'inherit'}">${efs(assigned)}</span>
-            <input class="c-inp" id="ca-i-${cat.id}" type="number" step="0.01">
+        <div class="c-right" onclick="openAssignSheet('${cat.id}')">
+          <div class="c-assigned">
+            <span style="color:${assigned<0?'var(--red-alert)':'inherit'}">${efs(assigned)}</span>
           </div>
           <div class="c-avail ${ov?'neg alert-box':(av===0&&assigned>0?'zer':'pos')}">${efs(av)}</div>
         </div>`;
-      row.querySelector('.c-assigned').onclick = e => startEdit(cat.id, e);
-      const inp = row.querySelector('.c-inp');
-      inp.onblur = () => endEdit(cat.id);
-      inp.onkeydown = e => { if(e.key==='Enter') endEdit(cat.id); if(e.key==='Escape') cancelEdit(cat.id); };
       crows.appendChild(row);
     });
 
@@ -1112,25 +1180,103 @@ function renderBudget() {
   calcTotals();
 }
 
-function startEdit(id, e) {
-  e.stopPropagation();
+// --- LOGICA MODAL ASIGNAR / MOVER DINERO ---
+function openAssignSheet(catId) {
+  editingAssignCatId = catId;
+  const cat = gc(catId);
+  if (!cat) return;
+  
   const mk = monthKey(currentMonth);
-  const el = document.getElementById('ca-'+id), inp = document.getElementById('ca-i-'+id);
-  el.classList.add('editing');
-  document.getElementById('ca-t-'+id).style.display = 'none';
-  inp.style.display = 'block'; inp.value = getMonthData(mk).assignments[id] || 0; inp.focus(); inp.select();
+  const md = getMonthData(mk);
+  const calc = getMonthCalculations(mk);
+  
+  const assigned = md.assignments[catId] || 0;
+  const avail = calc.catAvail[catId] || 0;
+  
+  document.getElementById('as-sh-title').textContent = cat.emoji + ' ' + cat.name;
+  document.getElementById('as-sh-avail').textContent = efs(avail);
+  document.getElementById('as-val').value = assigned;
+  
+  // Llenar el select de categorías destino
+  const sel = document.getElementById('mv-target');
+  sel.innerHTML = '<option value="">— Selecciona destino —</option>';
+  S.groups.forEach(g => {
+    const og = document.createElement('optgroup'); og.label = g.name;
+    let added = 0;
+    g.cats.forEach(c => { 
+      if(c.id !== catId) {
+        const o = document.createElement('option'); o.value = c.id; o.textContent = c.emoji + ' ' + c.name; og.appendChild(o);
+        added++; 
+      }
+    });
+    if (added > 0) sel.appendChild(og);
+  });
+  
+  document.getElementById('mv-val').value = '';
+  
+  setAssignMode('assign');
+  openSh('assign');
 }
-function endEdit(id) {
-  const el = document.getElementById('ca-'+id), inp = document.getElementById('ca-i-'+id);
-  if (!el || !inp) return;
-  getMonthData(monthKey(currentMonth)).assignments[id] = parseFloat(inp.value) || 0;
-  el.classList.remove('editing'); inp.style.display = 'none'; document.getElementById('ca-t-'+id).style.display = '';
-  save(); fullRender(); showToast('Asignación guardada');
+
+function setAssignMode(mode) {
+  currentAssignMode = mode;
+  document.getElementById('tab-as-assign').className = 'tab' + (mode === 'assign' ? ' on' : '');
+  document.getElementById('tab-as-move').className = 'tab' + (mode === 'move' ? ' on' : '');
+  document.getElementById('mode-assign').style.display = mode === 'assign' ? 'block' : 'none';
+  document.getElementById('mode-move').style.display = mode === 'move' ? 'block' : 'none';
 }
-function cancelEdit(id) {
-  const el = document.getElementById('ca-'+id); if(!el) return;
-  el.classList.remove('editing'); document.getElementById('ca-i-'+id).style.display = 'none'; document.getElementById('ca-t-'+id).style.display = '';
+
+function modAssign(val) {
+  const inp = document.getElementById('as-val');
+  let current = parseFloat(inp.value) || 0;
+  
+  if (val === 'clear') {
+    inp.value = 0;
+  } else if (val === 'toassign') {
+    const calc = getMonthCalculations(monthKey(currentMonth));
+    if (calc.toAssign > 0) {
+      inp.value = current + calc.toAssign;
+    } else {
+      showToast('No hay dinero libre para asignar');
+    }
+  } else {
+    inp.value = current + val;
+  }
 }
+
+function saveAssign() {
+  const mk = monthKey(currentMonth);
+  const md = getMonthData(mk);
+  
+  if (currentAssignMode === 'assign') {
+    const newVal = parseFloat(document.getElementById('as-val').value) || 0;
+    md.assignments[editingAssignCatId] = newVal;
+    showToast('Asignación guardada');
+  } else {
+    const moveAmt = parseFloat(document.getElementById('mv-val').value) || 0;
+    const targetId = document.getElementById('mv-target').value;
+    
+    if (moveAmt <= 0) {
+      showToast('Introduce una cantidad válida');
+      return;
+    }
+    if (!targetId) {
+      showToast('Selecciona una categoría destino');
+      return;
+    }
+    
+    // Restar a la categoría actual
+    md.assignments[editingAssignCatId] = (md.assignments[editingAssignCatId] || 0) - moveAmt;
+    // Sumar a la categoría destino
+    md.assignments[targetId] = (md.assignments[targetId] || 0) + moveAmt;
+    showToast('Dinero movido con éxito');
+  }
+  
+  save();
+  fullRender();
+  closeSh('assign');
+}
+
 
 // --- RENDER TX ---
 function renderTx() {
@@ -1179,7 +1325,7 @@ function renderTx() {
         <div class="tx-payer">${tx.pay}</div>
         <div class="tx-sub">${catLbl}${!tx.ok ? ' · pendiente' : ''}${tx.note && tx.note !== '🔄 Recurrente' ? ' · '+tx.note : ''}</div>
       </div>
-      <div class="tx-right">
+      <div class="tx-right" style="padding:0; box-shadow:none; background:transparent;">
         <div class="tx-amt ${colorClass}">${dispSign}${ef(dispAmt)}</div>
         <div class="tx-dt">${ds}</div>
       </div>`;
@@ -1339,6 +1485,38 @@ function renderSettings() {
   });
 }
 
+// --- RENDER RECURRING SHEET ---
+function renderRecSheet() {
+  const body = document.getElementById('rec-sheet-body');
+  if (!body) return;
+  
+  if (!S.recurringTxs || S.recurringTxs.length === 0) {
+    body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-3);font-size:0.9rem;font-weight:600;">No hay transacciones recurrentes.</div>';
+    return;
+  }
+  
+  // Renderiza la lista de transacciones recurrentes
+  body.innerHTML = S.recurringTxs.map(r => `
+    <div class="set-list" style="margin-bottom:12px; box-shadow:var(--neo-flat);">
+      <div class="set-row" style="cursor:default; padding: 12px 16px;">
+        <span class="set-lbl" style="display:flex; align-items:center; gap:12px;">
+          <span class="icon-btn" style="background:transparent;box-shadow:none;font-size:18px;">${r.emoji || '🔄'}</span>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <span style="color:var(--text-1); font-weight:700;">${r.pay}</span>
+            <span style="font-size:0.65rem; color:var(--text-3); font-weight:700; text-transform:uppercase;">Frecuencia: ${r.freq}</span>
+          </div>
+        </span>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="set-val" style="color:${r.type==='income'?'var(--blue)':'var(--rose)'}">${r.type==='income'?'+':'−'}${ef(Math.abs(r.amt))}</span>
+          <button class="icon-btn" style="color:var(--red-alert); background:var(--surf-1);" onclick="deleteRecurring('${r.id}')">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
 // --- SHEET LOGIC ---
 function openSh(name, argGroupId = null) {
   if (name === 'tx') {
@@ -1386,7 +1564,7 @@ function closeSh(name) {
 }
 
 // Background click closes sheets
-['tx','cat','goal','income','group','editcat','recurring','confirm'].forEach(n => {
+['tx','cat','goal','income','group','editcat','recurring','confirm','assign'].forEach(n => {
   const ov = document.getElementById('ov-'+n);
   if (ov) ov.addEventListener('click', e => { 
     if (e.target === ov) { 
@@ -1567,8 +1745,18 @@ function deleteEditCat() {
     'Borrar categoría',
     '¿Eliminar esta categoría? (Los movimientos asociados quedarán "Sin Categoría").',
     () => {
+      // Filtrar la categoría de los grupos
       S.groups.forEach(g => { g.cats = g.cats.filter(c => c.id !== editingCatId); }); 
+      // Desvincular transacciones
       S.txs.forEach(t => { if(t.cat === editingCatId) t.cat = null; }); 
+      
+      // Limpiar asignaciones huérfanas de todos los meses
+      Object.keys(S.monthData).forEach(mk => {
+        if (S.monthData[mk] && S.monthData[mk].assignments && S.monthData[mk].assignments[editingCatId] !== undefined) {
+          delete S.monthData[mk].assignments[editingCatId];
+        }
+      });
+
       editingCatId = null; 
       save(); 
       closeSh('editcat'); 
@@ -1588,3 +1776,5 @@ ensureRecurringForMonth(initMk); save(); updMonth(); fullRender();
 
 </body>
 </html>
+
+
