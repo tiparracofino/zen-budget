@@ -558,8 +558,13 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
           <span class="set-lbl"><span class="icon-btn">📥</span> Importar (JSON)</span>
         </div>
         <input type="file" id="import-input" accept=".json" style="display:none" onchange="importJSON(event)">
+        
+        <!-- BOTONES DE BORRADO ACTUALIZADOS -->
+        <div class="set-row" onclick="confirmFreshStart()">
+          <span class="set-lbl" style="color:var(--coral-deep)"><span class="icon-btn" style="color:var(--coral-deep)">🧹</span> Reiniciar movimientos y saldos</span>
+        </div>
         <div class="set-row" onclick="confirmReset()">
-          <span class="set-lbl" style="color:var(--red-alert)"><span class="icon-btn" style="color:var(--red-alert)">🗑</span> Borrar todos los datos</span>
+          <span class="set-lbl" style="color:var(--red-alert)"><span class="icon-btn" style="color:var(--red-alert)">🗑</span> Borrar TODO (Fábrica)</span>
         </div>
       </div>
 
@@ -870,7 +875,7 @@ svg{stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
       <div id="confirm-msg" style="font-size:0.95rem; font-weight:600; color:var(--text-2); margin-bottom:24px; line-height:1.5;"></div>
       <div class="btn-row">
         <button class="btn btn-soft" onclick="cancelConfirm()">Cancelar</button>
-        <button class="btn btn-warn" onclick="doConfirm()">Borrar</button>
+        <button class="btn btn-warn" id="confirm-yes-btn" onclick="doConfirm()">Borrar</button>
       </div>
     </div>
   </div>
@@ -905,9 +910,10 @@ let currentAssignMode = 'assign';
 let _confirmYes = null;
 let _confirmNo = null;
 
-function askConfirm(title, msg, onYes, onNo) {
+function askConfirm(title, msg, onYes, onNo, confirmBtnText = 'Borrar') {
   document.getElementById('confirm-title').textContent = title;
   document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-yes-btn').textContent = confirmBtnText;
   _confirmYes = onYes;
   _confirmNo = onNo;
   document.getElementById('ov-confirm').classList.add('open');
@@ -978,15 +984,39 @@ function importJSON(e) {
   };
   r.readAsText(f);
 }
-function confirmReset() {
+
+/* --- NUEVAS FUNCIONES DE BORRADO --- */
+
+function confirmFreshStart() {
   askConfirm(
-    'Borrar datos', 
-    '¿Eliminar TODOS los datos permanentemente? Esta acción es irreversible.',
+    'Reiniciar presupuesto', 
+    '¿Quieres borrar todos los movimientos y asignaciones? Mantendremos tus categorías, grupos y metas intactas.',
     () => {
-      S = JSON.parse(JSON.stringify(DEFAULT_STATE)); save(); fullRender(); showToast('Datos borrados');
-    }
+      S.txs = [];
+      S.monthData = {};
+      S.goals.forEach(g => g.saved = 0);
+      S.recurringDeleted = {};
+      save(); 
+      fullRender(); 
+      showToast('Presupuesto reiniciado ✓');
+    },
+    null,
+    'Reiniciar'
   );
 }
+
+function confirmReset() {
+  askConfirm(
+    'Restablecimiento de fábrica', 
+    '¿Eliminar TODOS los datos permanentemente, incluyendo categorías y metas? Esta acción es irreversible.',
+    () => {
+      S = JSON.parse(JSON.stringify(DEFAULT_STATE)); save(); fullRender(); showToast('Datos borrados');
+    },
+    null,
+    'Borrar todo'
+  );
+}
+
 
 function getMonthData(mk) {
   if (!S.monthData) S.monthData = {};
@@ -1414,8 +1444,7 @@ function initSwipe(item, wrap, txId) {
             wrap.style.transition = 'all .25s var(--ease)'; wrap.style.maxHeight = '0'; wrap.style.opacity = '0'; wrap.style.margin = '0';
             setTimeout(() => wrap.remove(), 250);
           }, 150);
-        },
-        () => { item.style.transform = 'translateX(0)'; }
+        }
       );
     } else { item.style.transform = 'translateX(0)'; }
   });
