@@ -1191,6 +1191,54 @@ function updMonth() {
   }
 }
 
+/* --- NUEVA LÓGICA COPIAR MES ANTERIOR --- */
+function copyPreviousMonthBudget() {
+  const prevDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+  const currKey = monthKey(currentMonth);
+  const prevKey = monthKey(prevDate);
+
+  const prevData = S.monthData[prevKey];
+  if (!prevData || !prevData.assignments || Object.keys(prevData.assignments).length === 0) {
+    showToast('El mes anterior no tiene asignaciones');
+    return;
+  }
+
+  const currData = getMonthData(currKey);
+  let currentTotalAssigned = 0;
+  if (currData.assignments) {
+    currentTotalAssigned = Object.values(currData.assignments).reduce((a, b) => a + b, 0);
+  }
+
+  const doCopy = () => {
+    // Para asegurarnos de que no copiamos dinero a categorías que ya fueron eliminadas
+    const validCatIds = new Set();
+    S.groups.forEach(g => g.cats.forEach(c => validCatIds.add(c.id)));
+
+    currData.assignments = {};
+    for (const [catId, amount] of Object.entries(prevData.assignments)) {
+      if (validCatIds.has(catId)) {
+        currData.assignments[catId] = amount;
+      }
+    }
+    
+    save();
+    fullRender();
+    showToast('Presupuesto copiado ✓');
+  };
+
+  if (currentTotalAssigned > 0) {
+    askConfirm(
+      'Sobrescribir asignaciones',
+      'Ya tienes dinero asignado en este mes. ¿Quieres sobrescribirlo todo con el presupuesto del mes anterior?',
+      doCopy,
+      null,
+      'Sobrescribir'
+    );
+  } else {
+    doCopy();
+  }
+}
+
 function renderBudget() {
   const mk = monthKey(currentMonth);
   const md = getMonthData(mk);
@@ -1211,6 +1259,21 @@ function renderBudget() {
     calcTotals();
     return;
   }
+
+  // --- BOTÓN COPIAR MES ANTERIOR ---
+  const actRow = document.createElement('div');
+  actRow.style.display = 'flex';
+  actRow.style.justifyContent = 'space-between';
+  actRow.style.alignItems = 'center';
+  actRow.style.marginBottom = '14px';
+  actRow.innerHTML = `
+    <div style="font-size:0.85rem; font-weight:700; color:var(--text-2); text-transform:uppercase; letter-spacing:0.05em;">Categorías</div>
+    <button class="btn-new" style="display:flex; align-items:center; gap:6px; color:var(--coral);" onclick="copyPreviousMonthBudget()">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+      Copiar anterior
+    </button>
+  `;
+  body.appendChild(actRow);
 
   S.groups.forEach(grp => {
     let gaThisMonth = 0, gvTotal = 0;
